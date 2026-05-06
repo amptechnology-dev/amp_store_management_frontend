@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,9 +9,9 @@ import axiosInstance from "@/service/axios.service";
 import { toast } from "react-toastify";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
+import { Dropdown } from "primereact/dropdown";
 import { InputText } from "primereact/inputtext";
 import { InputTextarea } from "primereact/inputtextarea";
-import { InputNumber } from "primereact/inputnumber";
 import { Checkbox } from "primereact/checkbox";
 import Image from "next/image";
 import { useProfileStore } from "@/lib/store/profileStore";
@@ -27,11 +28,12 @@ const timingByDaySchema = z.object({
 });
 
 const baseStoreFormSchema = z.object({
-  name: z.string().min(2, "Owner name is required"),
-  email: z.string().email("Valid email is required"),
-  phone: z.string().min(10, "Valid phone number required"),
+  name: z.string().optional(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
   password: z.string().optional(),
   storeName: z.string().min(2, "Store name is required"),
+  storeType: z.string().min(1, "Store type is required"),
   description: z.string().optional(),
   contactNo: z.string().min(10, "Contact number is required"),
   whatsappNo: z.string().min(10, "WhatsApp number is required"),
@@ -51,9 +53,47 @@ const baseStoreFormSchema = z.object({
   isVerify: z.boolean().optional(),
 });
 
-const getStoreFormSchema = (isEditMode: boolean) =>
+const getStoreFormSchema = (isEditMode: boolean, mode: "admin" | "store") =>
   baseStoreFormSchema.superRefine((values, context) => {
-    if (!isEditMode && !values.password?.trim()) {
+    const requireOwnerFields = mode !== "store";
+
+    if (requireOwnerFields && !values.name?.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["name"],
+        message: "Owner name is required",
+      });
+    }
+
+    if (requireOwnerFields && !values.email?.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["email"],
+        message: "Valid email is required",
+      });
+    } else if (requireOwnerFields && values.email && !/^\S+@\S+\.\S+$/.test(values.email)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["email"],
+        message: "Valid email is required",
+      });
+    }
+
+    if (requireOwnerFields && !values.phone?.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["phone"],
+        message: "Valid phone number required",
+      });
+    } else if (requireOwnerFields && (values.phone?.length || 0) < 10) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["phone"],
+        message: "Valid phone number required",
+      });
+    }
+
+    if (!isEditMode && !values.password?.trim() && requireOwnerFields) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["password"],
@@ -62,7 +102,7 @@ const getStoreFormSchema = (isEditMode: boolean) =>
       return;
     }
 
-    if (!isEditMode && (values.password?.length || 0) < 6) {
+    if (!isEditMode && requireOwnerFields && (values.password?.length || 0) < 6) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["password"],
@@ -76,6 +116,7 @@ type StoreFormData = z.infer<typeof baseStoreFormSchema>;
 type StoreFormProps = {
   storeId?: string | null;
   createEndpoint?: string;
+  mode?: "admin" | "store";
   onClose: () => void;
   onSuccess: () => void;
 };
@@ -88,6 +129,61 @@ const DAYS = [
   "friday",
   "saturday",
   "sunday",
+] as const;
+
+const STORE_TYPES = [
+  { label: "Grocery", value: "Grocery", icon: "pi pi-shopping-basket" },
+  { label: "Electronics", value: "Electronics", icon: "pi pi-mobile" },
+  { label: "Clothing", value: "Clothing", icon: "pi pi-tag" },
+  { label: "Pharmacy", value: "Pharmacy", icon: "pi pi-heart" },
+  { label: "Books", value: "Books", icon: "pi pi-book" },
+  { label: "Furniture", value: "Furniture", icon: "pi pi-table" },
+  { label: "Other", value: "Other", icon: "pi pi-ellipsis-h" },
+] as const;
+
+type StoreTypeOption = {
+  label: string;
+  value: string;
+  icon: string;
+};
+
+const INDIAN_STATES = [
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Andaman and Nicobar Islands",
+  "Chandigarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Jammu and Kashmir",
+  "Ladakh",
+  "Lakshadweep",
+  "Puducherry",
 ] as const;
 
 const parseTimeToDate = (value?: string) => {
@@ -161,7 +257,61 @@ const createTimingRow = (day = "", timing = ""): TimingRow => ({
 
 const normalizeDay = (value: string) => value.trim().toLowerCase();
 
-function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onClose, onSuccess }: StoreFormProps) {
+const LocationPicker = dynamic(() => import("@/helper/LocationPicker"), {
+  ssr: false,
+});
+
+const INDIA_CENTER = {
+  latitude: 22.9734,
+  longitude: 78.6569,
+};
+
+const STATE_CENTERS: Record<string, [number, number]> = {
+  "Andhra Pradesh": [15.9129, 79.7400],
+  "Arunachal Pradesh": [28.2180, 94.7278],
+  Assam: [26.2006, 92.9376],
+  Bihar: [25.0961, 85.3131],
+  Chhattisgarh: [21.2787, 81.8661],
+  Goa: [15.2993, 74.1240],
+  Gujarat: [22.2587, 71.1924],
+  Haryana: [29.0588, 76.0856],
+  "Himachal Pradesh": [31.1048, 77.1734],
+  Jharkhand: [23.6102, 85.2799],
+  Karnataka: [15.3173, 75.7139],
+  Kerala: [10.8505, 76.2711],
+  "Madhya Pradesh": [22.9734, 78.6569],
+  Maharashtra: [19.7515, 75.7139],
+  Manipur: [24.6637, 93.9063],
+  Meghalaya: [25.4670, 91.3662],
+  Mizoram: [23.1645, 92.9376],
+  Nagaland: [26.1584, 94.5624],
+  Odisha: [20.9517, 85.0985],
+  Punjab: [31.1471, 75.3412],
+  Rajasthan: [27.0238, 74.2179],
+  Sikkim: [27.5330, 88.5122],
+  "Tamil Nadu": [11.1271, 78.6569],
+  Telangana: [18.1124, 79.0193],
+  Tripura: [23.9408, 91.9882],
+  "Uttar Pradesh": [26.8467, 80.9462],
+  Uttarakhand: [30.0668, 79.0193],
+  "West Bengal": [22.9868, 87.8550],
+  "Andaman and Nicobar Islands": [11.7401, 92.6586],
+  Chandigarh: [30.7333, 76.7794],
+  "Dadra and Nagar Haveli and Daman and Diu": [20.3974, 72.8328],
+  Delhi: [28.7041, 77.1025],
+  "Jammu and Kashmir": [33.7782, 76.5762],
+  Ladakh: [34.2268, 77.5619],
+  Lakshadweep: [10.5667, 72.6417],
+  Puducherry: [11.9416, 79.8083],
+};
+
+function StoreForm({
+  storeId,
+  createEndpoint = "/api/register/create-user",
+  mode = "admin",
+  onClose,
+  onSuccess,
+}: StoreFormProps) {
   const { profile } = useProfileStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -175,10 +325,12 @@ function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onCl
   const [keywordInput, setKeywordInput] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [isVerify, setIsVerify] = useState(false);
+  const [isMapLoading, setIsMapLoading] = useState(false);
   const canShowVerifyField = profile?.role === "ADMIN";
 
   const isEditMode = !!storeId;
-  const storeFormSchema = getStoreFormSchema(isEditMode);
+  const isStoreMode = mode === "store" && !isEditMode;
+  const storeFormSchema = getStoreFormSchema(isEditMode, mode);
 
   const {
     register,
@@ -186,6 +338,7 @@ function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onCl
     control,
     reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<StoreFormData>({
     resolver: zodResolver(storeFormSchema),
@@ -195,6 +348,7 @@ function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onCl
       phone: "",
       password: "",
       storeName: "",
+      storeType: "",
       description: "",
       contactNo: "",
       whatsappNo: "",
@@ -204,7 +358,7 @@ function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onCl
       long: 0,
       area: "",
       state: "",
-      country: "",
+      country: "India",
       timingOpen: "",
       timingClose: "",
       seoDescription: "",
@@ -220,6 +374,80 @@ function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onCl
     }
   }, [storeId]);
 
+  const selectedLat = watch("lat");
+  const selectedLong = watch("long");
+  const selectedArea = watch("area");
+  const selectedState = watch("state");
+  const selectedCountry = watch("country") || "India";
+  const mapCenter = STATE_CENTERS[selectedState] || [INDIA_CENTER.latitude, INDIA_CENTER.longitude];
+  const storeTypeOptions: StoreTypeOption[] = STORE_TYPES.map((option) => ({ ...option }));
+
+  const renderStoreTypeOption = (option: StoreTypeOption) => (
+    <div className="flex items-center gap-2">
+      <i className={`${option.icon} text-yellow-700`} />
+      <span>{option.label}</span>
+    </div>
+  );
+
+  const renderStoreTypeValue = (option: StoreTypeOption | null) => {
+    if (!option) {
+      return <span className="text-gray-400">Select store type</span>;
+    }
+
+    return (
+      <div className="flex items-center gap-2">
+        <i className={`${option.icon} text-yellow-700`} />
+        <span>{option.label}</span>
+      </div>
+    );
+  };
+
+  const setLocationFromMap = async (latitude: number, longitude: number) => {
+    setValue("lat", latitude, { shouldDirty: true, shouldValidate: true });
+    setValue("long", longitude, { shouldDirty: true, shouldValidate: true });
+
+    setIsMapLoading(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+        { headers: { Accept: "application/json" } }
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to resolve location from map");
+      }
+
+      const result = await response.json();
+      const address = (result?.address || {}) as Record<string, string | undefined>;
+
+      const areaName =
+        address.suburb ||
+        address.city_district ||
+        address.city ||
+        address.town ||
+        address.village ||
+        address.municipality ||
+        address.county ||
+        address.state_district ||
+        result?.display_name?.split(",")[0] ||
+        selectedArea ||
+        "";
+
+      const stateName = address.state || address.region || address.state_district || selectedState || "";
+      const countryName = address.country || selectedCountry || "India";
+
+      setValue("area", areaName, { shouldDirty: true, shouldValidate: true });
+      if (stateName) {
+        setValue("state", stateName, { shouldDirty: true, shouldValidate: true });
+      }
+      setValue("country", countryName, { shouldDirty: true, shouldValidate: true });
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to resolve location from map");
+    } finally {
+      setIsMapLoading(false);
+    }
+  };
+
   const fetchStoreData = async () => {
     try {
       setLoading(true);
@@ -233,6 +461,7 @@ function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onCl
       setValue("email", store.owner?.email || "");
       setValue("phone", store.owner?.phone || "");
       setValue("storeName", store.storeName?.trim() || "");
+      setValue("storeType", store.storeType?.trim() || "");
       setValue("description", store.description?.trim() || "");
       setValue("contactNo", store.contactNo?.trim() || "");
       setValue("whatsappNo", store.whatsappNo?.trim() || "");
@@ -357,16 +586,19 @@ function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onCl
       const formData = new FormData();
 
       // Append all text fields
-      formData.append("name", data.name);
-      formData.append("email", data.email);
-      formData.append("phone", data.phone);
-      if (data.password && !isEditMode) {
-        formData.append("password", data.password);
+      if (!isStoreMode) {
+        if (data.name) formData.append("name", data.name);
+        if (data.email) formData.append("email", data.email);
+        if (data.phone) formData.append("phone", data.phone);
+        if (data.password && !isEditMode) {
+          formData.append("password", data.password);
+        }
       }
-      formData.append("storeName", data.storeName);
+      formData.append("storeName", data.storeName || "");
+      formData.append("storeType", data.storeType || "");
       formData.append("description", data.description || "");
-      formData.append("contactNo", data.contactNo);
-      formData.append("whatsappNo", data.whatsappNo);
+      formData.append("contactNo", data.contactNo || "");
+      formData.append("whatsappNo", data.whatsappNo || "");
       formData.append("website", data.website || "");
       formData.append("gstin", data.gstin || "");
       formData.append("lat", data.lat.toString());
@@ -461,72 +693,73 @@ function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onCl
   return (
     <div className="px-4 pt-2 pb-4 min-h-[80vh]">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Owner Information */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-            <i className="pi pi-user" style={{ color: "#d89f00" }}></i>
-            Owner Information
-          </h3>
+        {!isStoreMode && (
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+              <i className="pi pi-user" style={{ color: "#d89f00" }}></i>
+              Owner Information
+            </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-                Owner Name <span className="text-red-500">*</span>
-              </label>
-              <InputText
-                {...register("name")}
-                placeholder="Enter owner name"
-                onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                  e.currentTarget.value = e.currentTarget.value.replace(/\d/g, "");
-                }}
-                className={`w-full p-2 border rounded-lg ${errors.name ? "border-red-500" : "border-yellow-300"}`}
-              />
-              {errors.name && <small className="text-red-500">{errors.name.message}</small>}
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                  Owner Name <span className="text-red-500">*</span>
+                </label>
+                <InputText
+                  {...register("name")}
+                  placeholder="Enter owner name"
+                  onInput={(e: React.FormEvent<HTMLInputElement>) => {
+                    e.currentTarget.value = e.currentTarget.value.replace(/\d/g, "");
+                  }}
+                  className={`w-full p-2 border rounded-lg ${errors.name ? "border-red-500" : "border-yellow-300"}`}
+                />
+                {errors.name && <small className="text-red-500">{errors.name.message}</small>}
+              </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-                Email <span className="text-red-500">*</span>
-              </label>
-              <InputText
-                {...register("email")}
-                type="email"
-                placeholder="Enter email"
-                className={`w-full p-2 border rounded-lg ${errors.email ? "border-red-500" : "border-yellow-300"}`}
-              />
-              {errors.email && <small className="text-red-500">{errors.email.message}</small>}
-            </div>
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <InputText
+                  {...register("email")}
+                  type="email"
+                  placeholder="Enter email"
+                  className={`w-full p-2 border rounded-lg ${errors.email ? "border-red-500" : "border-yellow-300"}`}
+                />
+                {errors.email && <small className="text-red-500">{errors.email.message}</small>}
+              </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-                Phone <span className="text-red-500">*</span>
-              </label>
-              <InputText
-                {...register("phone")}
-                placeholder="Enter phone"
-                inputMode="numeric"
-                onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                  e.currentTarget.value = e.currentTarget.value.replace(/\D/g, "");
-                }}
-                className={`w-full p-2 border rounded-lg ${errors.phone ? "border-red-500" : "border-yellow-300"}`}
-              />
-              {errors.phone && <small className="text-red-500">{errors.phone.message}</small>}
-            </div>
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                  Phone <span className="text-red-500">*</span>
+                </label>
+                <InputText
+                  {...register("phone")}
+                  placeholder="Enter phone"
+                  inputMode="numeric"
+                  onInput={(e: React.FormEvent<HTMLInputElement>) => {
+                    e.currentTarget.value = e.currentTarget.value.replace(/\D/g, "");
+                  }}
+                  className={`w-full p-2 border rounded-lg ${errors.phone ? "border-red-500" : "border-yellow-300"}`}
+                />
+                {errors.phone && <small className="text-red-500">{errors.phone.message}</small>}
+              </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-                Password {!isEditMode && <span className="text-red-500">*</span>}
-              </label>
-              <InputText
-                {...register("password")}
-                type="password"
-                placeholder="Enter password"
-                className={`w-full p-2 border rounded-lg ${errors.password ? "border-red-500" : "border-yellow-300"}`}
-              />
-              {errors.password && <small className="text-red-500">{errors.password.message}</small>}
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                  Password {!isEditMode && <span className="text-red-500">*</span>}
+                </label>
+                <InputText
+                  {...register("password")}
+                  type="password"
+                  placeholder="Enter password"
+                  className={`w-full p-2 border rounded-lg ${errors.password ? "border-red-500" : "border-yellow-300"}`}
+                />
+                {errors.password && <small className="text-red-500">{errors.password.message}</small>}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Store Information */}
         <div className="space-y-3">
@@ -546,6 +779,31 @@ function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onCl
                 className={`w-full p-2 border rounded-lg ${errors.storeName ? "border-red-500" : "border-yellow-300"}`}
               />
               {errors.storeName && <small className="text-red-500">{errors.storeName.message}</small>}
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                Store Type <span className="text-red-500">*</span>
+              </label>
+              <Controller
+                name="storeType"
+                control={control}
+                render={({ field }) => (
+                  <Dropdown
+                    value={field.value}
+                    onChange={(e) => field.onChange(e.value)}
+                    options={storeTypeOptions}
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="Select store type"
+                    className={`w-full ${errors.storeType ? "border-red-500" : "border-yellow-300"}`}
+                    panelClassName="!text-sm"
+                    itemTemplate={renderStoreTypeOption}
+                    valueTemplate={renderStoreTypeValue}
+                  />
+                )}
+              />
+              {errors.storeType && <small className="text-red-500">{errors.storeType.message}</small>}
             </div>
 
             <div className="space-y-1">
@@ -611,6 +869,41 @@ function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onCl
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
+              <label className="text-sm font-semibold text-gray-700">Country</label>
+              <Controller
+                name="country"
+                control={control}
+                render={({ field }) => (
+                  <InputText
+                    value={field.value || "India"}
+                    readOnly
+                    className="w-full p-2 border rounded-lg border-yellow-300 bg-gray-100 text-gray-700"
+                  />
+                )}
+              />
+              {errors.country && <small className="text-red-500">{errors.country.message}</small>}
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-semibold text-gray-700">State</label>
+              <Controller
+                name="state"
+                control={control}
+                render={({ field }) => (
+                  <Dropdown
+                    value={field.value}
+                    onChange={(e) => field.onChange(e.value)}
+                    options={INDIAN_STATES.map((stateName) => ({ label: stateName, value: stateName }))}
+                    placeholder="Select state"
+                    className={`w-full ${errors.state ? "border-red-500" : "border-yellow-300"}`}
+                    panelClassName="!text-sm"
+                  />
+                )}
+              />
+              {errors.state && <small className="text-red-500">{errors.state.message}</small>}
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
               <label className="text-sm font-semibold text-gray-700">Area</label>
               <InputText
                 {...register("area")}
@@ -620,24 +913,42 @@ function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onCl
               {errors.area && <small className="text-red-500">{errors.area.message}</small>}
             </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">State</label>
-              <InputText
-                {...register("state")}
-                placeholder="Enter state"
-                className={`w-full p-2 border rounded-lg ${errors.state ? "border-red-500" : "border-yellow-300"}`}
-              />
-              {errors.state && <small className="text-red-500">{errors.state.message}</small>}
-            </div>
+            <div className="space-y-2 md:col-span-2">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <label className="text-sm font-semibold text-gray-700">Select area on map</label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Click the map or drag the marker to fill area, latitude, and longitude automatically.
+                  </p>
+                </div>
+                <div className="text-xs text-gray-500 text-right">
+                  <div>Lat: {Number(selectedLat || INDIA_CENTER.latitude).toFixed(6)}</div>
+                  <div>Long: {Number(selectedLong || INDIA_CENTER.longitude).toFixed(6)}</div>
+                </div>
+              </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">Country</label>
-              <InputText
-                {...register("country")}
-                placeholder="Enter country"
-                className={`w-full p-2 border rounded-lg ${errors.country ? "border-red-500" : "border-yellow-300"}`}
-              />
-              {errors.country && <small className="text-red-500">{errors.country.message}</small>}
+              <div
+                className="rounded-2xl overflow-hidden border border-yellow-200 shadow-[0_16px_40px_rgba(15,23,42,0.12)]"
+                style={{
+                  minHeight: 320,
+                  background: "linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,251,236,0.98) 100%)",
+                }}
+              >
+                {isMapLoading ? (
+                  <div className="h-[320px] flex items-center justify-center bg-gradient-to-br from-yellow-50 to-white text-gray-600">
+                    Resolving location...
+                  </div>
+                ) : (
+                  <LocationPicker
+                    latitude={Number(selectedLat || INDIA_CENTER.latitude)}
+                    longitude={Number(selectedLong || INDIA_CENTER.longitude)}
+                    center={mapCenter}
+                    onPick={(latitude, longitude) => {
+                      void setLocationFromMap(latitude, longitude);
+                    }}
+                  />
+                )}
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -649,48 +960,8 @@ function StoreForm({ storeId, createEndpoint = "/api/register/create-user", onCl
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">Latitude</label>
-              <Controller
-                name="lat"
-                control={control}
-                render={({ field }) => (
-                  <InputNumber
-                    value={field.value}
-                    onValueChange={(e) => field.onChange(e.value)}
-                    placeholder="Enter latitude"
-                    mode="decimal"
-                    minFractionDigits={4}
-                    maxFractionDigits={6}
-                    step={0.0001}
-                    className={`w-full p-2 border rounded-lg border-yellow-300`}
-                    inputClassName="w-full"
-                  />
-                )}
-              />
-              {errors.lat && <small className="text-red-500">{errors.lat.message}</small>}
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">Longitude</label>
-              <Controller
-                name="long"
-                control={control}
-                render={({ field }) => (
-                  <InputNumber
-                    value={field.value}
-                    onValueChange={(e) => field.onChange(e.value)}
-                    placeholder="Enter longitude"
-                    mode="decimal"
-                    minFractionDigits={4}
-                    maxFractionDigits={6}
-                    step={0.0001}
-                    className={`w-full p-2 border rounded-lg border-yellow-300`}
-                    inputClassName="w-full"
-                  />
-                )}
-              />
-            </div>
+            <input type="hidden" {...register("lat", { valueAsNumber: true })} />
+            <input type="hidden" {...register("long", { valueAsNumber: true })} />
           </div>
         </div>
 

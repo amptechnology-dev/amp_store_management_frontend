@@ -44,6 +44,36 @@ interface Store {
 
 const dummyStores: Store[] = [];
 
+const advertisementSlots = [
+  {
+    id: 'ad-1',
+    title: 'Featured Store Promotion',
+    description: 'Premium placement for your store banner, offers, and seasonal campaigns.',
+    image:
+      'https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=900&h=700&fit=crop',
+    cta: 'Book Ad Space',
+    tone: 'from-sky-500 to-blue-600',
+  },
+  {
+    id: 'ad-2',
+    title: 'Local Business Spotlight',
+    description: 'Highlight trusted local stores with a dedicated spotlight card.',
+    image:
+      'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=900&h=700&fit=crop',
+    cta: 'View Spotlight',
+    tone: 'from-emerald-500 to-teal-600',
+  },
+  {
+    id: 'ad-3',
+    title: 'Seasonal Offer Banner',
+    description: 'Reserve this section for rotating offers, coupons, and upcoming promotions.',
+    image:
+      'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=900&h=700&fit=crop',
+    cta: 'Reserve Now',
+    tone: 'from-amber-500 to-orange-600',
+  },
+];
+
 const parseStoreTimeToMinutes = (value: string) => {
   const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
   const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/);
@@ -166,10 +196,99 @@ export default function Home() {
     };
   };
 
+  const renderStoreCard = (store: Store) => {
+    const storeStatus = getStoreStatus(store);
+
+    return (
+      <div key={store._id} className="bg-white rounded-xl shadow-md hover:shadow-2xl transition-all duration-300 overflow-hidden border border-yellow-100 flex flex-col h-full hover:border-yellow-300">
+        <div className="relative w-full h-32 sm:h-36 md:h-40 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 group-hover:scale-105 transition-transform duration-300">
+          {store.images && store.images.length > 0 ? (
+            <img
+              src={store.images[0]}
+              alt={`${store.storeName} banner`}
+              className="w-full h-full object-cover"
+              onError={(e: any) => {
+                e.target.src = 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=500&h=300&fit=crop';
+              }}
+            />
+          ) : (
+            <div
+              className={`w-full h-full flex items-center justify-center text-white text-4xl font-bold ${stringToBg(
+                store.storeName
+              )} shadow-lg`}
+            >
+              {getInitials(store.storeName)}
+            </div>
+          )}
+
+          {store.isVerify && (
+            <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-full p-1.5 shadow-lg z-10">
+              <i className="pi pi-check text-sm font-bold"></i>
+            </div>
+          )}
+
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300"></div>
+        </div>
+
+        <div className="p-3 sm:p-4 flex flex-col gap-2 flex-1">
+          <div>
+            <h4 className="text-sm md:text-base font-bold text-gray-900 line-clamp-1">{store.storeName}</h4>
+            <p className="text-xs text-gray-600 line-clamp-1">
+              Owner: <span className="font-medium">{store.userId?.name || 'N/A'}</span>
+            </p>
+          </div>
+
+          <div className="text-xs text-gray-700 space-y-1.5 flex-1">
+            <p>
+              <span className="font-semibold">📍</span> <span className="font-medium">{store.address?.area}</span>
+              <br />
+              <span className="text-gray-500 ml-6">
+                {store.address?.state}, {store.address?.country}
+              </span>
+            </p>
+            <p>
+              <span className="font-semibold">📞</span>{' '}
+              <a href={`tel:${store.contactNo}`} className="font-medium text-blue-600 hover:text-blue-700 hover:underline">
+                {store.contactNo}
+              </a>
+            </p>
+            <p>
+              <span className="font-semibold">📧</span>{' '}
+              <a
+                href={`mailto:${store.email}`}
+                className="font-medium text-blue-600 hover:text-blue-700 hover:underline break-all"
+              >
+                {store.email}
+              </a>
+            </p>
+            <p>
+              <span className="font-semibold">⏰</span> {store.timing?.open} - {store.timing?.close}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-200">
+            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${storeStatus.className}`}>
+              {storeStatus.label}
+            </span>
+            <Link href={`/store/${store._id}`}>
+              <Button
+                icon="pi pi-arrow-right"
+                rounded
+                text
+                className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 font-bold"
+                title="View Details"
+              />
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-amber-50">
       {/* Header Component */}
-      <Header onLoginClick={() => setShowLoginModal(true)} />
+      <Header />
 
       {/* Hero Section */}
       <section 
@@ -192,34 +311,11 @@ export default function Home() {
             Discover amazing deals from local stores and get the best shopping experience with AMP Shopping.
           </p>
 
-          {/* Search Bar */}
-          <div className="max-w-2xl mx-auto mb-8">
-            <IconField iconPosition="left">
-              <InputIcon className="pi pi-search text-gray-400" />
-              <InputText
-                type="text"
-                placeholder="Search by store name or location..."
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="w-full text-sm sm:text-base"
-                style={{
-                  padding: '14px 14px 14px 40px',
-                  border: '2px solid #fbbf24',
-                  borderRadius: '12px',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 0 30px rgba(251, 191, 36, 0.4)',
-                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                  fontWeight: '500',
-                }}
-              />
-            </IconField>
-          </div>
-
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4">
             <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-3 sm:p-4 border border-yellow-200 hover:shadow-xl transition-shadow">
               <p className="text-2xl sm:text-3xl font-bold text-yellow-600">{allStores.length}</p>
-              <p className="text-xs sm:text-sm text-gray-700 font-medium">Active Stores</p>
+              <p className="text-xs sm:text-sm text-gray-700 font-medium">Registered Stores</p>
             </div>
             <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-3 sm:p-4 border border-orange-200 hover:shadow-xl transition-shadow">
               <p className="text-2xl sm:text-3xl font-bold text-orange-600">24/7</p>
@@ -237,18 +333,113 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Advertisement Showcase */}
+      <section className="relative z-10 px-4 sm:px-6 lg:px-8 pt-10 sm:pt-14 pb-8 sm:pb-16">
+        <div className="max-w-7xl mx-auto rounded-[2rem] bg-white/90 backdrop-blur-sm shadow-[0_20px_60px_rgba(0,0,0,0.08)] border border-white/70 p-4 sm:p-6 lg:p-8">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-5 sm:mb-8">
+            <div className="max-w-3xl">
+              <p className="text-xs uppercase tracking-[0.35em] text-yellow-600 font-bold">Advertisement</p>
+              <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">Promotional space for stores</h3>
+              <p className="text-sm sm:text-base text-gray-600 mt-2 leading-6">
+                This block is static for now and can later be connected to dynamic ad content.
+              </p>
+            </div>
+            <Link
+              href="/register"
+              className="inline-flex w-fit items-center justify-center rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-md transition-transform hover:-translate-y-0.5"
+            >
+              Register Store
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr_1fr] gap-4 sm:gap-5">
+            {advertisementSlots.map((slot, index) => (
+              <article
+                key={slot.id}
+                className={`relative min-h-[260px] overflow-hidden rounded-3xl border border-white/60 bg-white shadow-xl ${
+                  index === 0 ? 'lg:min-h-[360px]' : 'lg:min-h-[360px]'
+                }`}
+              >
+                <div className="absolute inset-0">
+                  <img src={slot.image} alt={slot.title} className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10"></div>
+                </div>
+                <div className="relative flex h-full flex-col justify-end p-5 sm:p-6 text-white">
+                  <span className="mb-3 w-fit rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] backdrop-blur-sm">
+                    Advertisement
+                  </span>
+                  <h4 className="text-xl sm:text-2xl font-bold leading-tight">{slot.title}</h4>
+                  <p className="mt-2 max-w-md text-sm sm:text-base text-white/85">{slot.description}</p>
+                  <div className="mt-5 flex items-center gap-3">
+                    <button
+                      type="button"
+                      className={`inline-flex items-center justify-center rounded-full bg-gradient-to-r ${slot.tone} px-4 py-2 text-sm font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5`}
+                    >
+                      {slot.cta}
+                    </button>
+                    <span className="text-xs font-semibold uppercase tracking-[0.2em] text-white/75">
+                      Static placeholder
+                    </span>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Stores Section */}
-      <section className="py-8 sm:py-16 px-4 sm:px-6 lg:px-8">
+      <section className="py-8 sm:py-16 px-4 sm:px-6 lg:px-8 bg-white/70">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-6 sm:mb-10">
-            <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-              {searchQuery ? `Search Results (${filteredStores.length})` : 'Featured Stores'}
-            </h3>
-            <p className="text-sm sm:text-base text-gray-600">
-              {searchQuery
-                ? 'Here are the stores matching your search'
-                : 'Browse our collection of verified local stores'}
-            </p>
+          <div className="mb-6 sm:mb-10 rounded-[1.75rem] border border-yellow-100 bg-white/95 backdrop-blur-sm shadow-lg p-4 sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-xs uppercase tracking-[0.35em] text-yellow-600 font-bold mb-2">Search Stores</p>
+                <h3 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                  {searchQuery ? `Search Results (${filteredStores.length})` : 'Registered Stores'}
+                </h3>
+                <p className="text-sm sm:text-base text-gray-600 mt-2">
+                  Search by store name, area, or state to filter the store list quickly.
+                </p>
+              </div>
+
+              <div className="w-full lg:w-[32rem]">
+                <IconField iconPosition="left">
+                  <InputIcon className="pi pi-search text-gray-400" />
+                  <InputText
+                    type="text"
+                    placeholder="Search by store name or location..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    className="w-full text-sm sm:text-base"
+                    style={{
+                      padding: '14px 14px 14px 40px',
+                      border: '2px solid #fbbf24',
+                      borderRadius: '14px',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 0 24px rgba(251, 191, 36, 0.18)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                      fontWeight: '500',
+                    }}
+                  />
+                </IconField>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6 sm:mb-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+            <div>
+              <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Store List</h3>
+              <p className="text-sm sm:text-base text-gray-600">
+                {searchQuery
+                  ? 'Here are the stores matching your search'
+                  : 'Browse our collection of verified local stores'}
+              </p>
+            </div>
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-yellow-200 bg-yellow-50 px-4 py-2 text-sm font-semibold text-yellow-800">
+              <span className="h-2 w-2 rounded-full bg-yellow-500"></span>
+              Marketplace ready
+            </div>
           </div>
 
           {/* Loading State */}
@@ -289,105 +480,7 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-              {filteredStores.map((store) => (
-                <div key={store._id} className="group">
-                  {(() => {
-                    const storeStatus = getStoreStatus(store);
-
-                    return (
-                      <div className="bg-white rounded-xl shadow-md hover:shadow-2xl transition-all duration-300 overflow-hidden border border-yellow-100 flex flex-col h-full hover:border-yellow-300">
-                    {/* Image Section with Carousel */}
-                    <div className="relative w-full h-32 sm:h-36 md:h-40 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 group-hover:scale-105 transition-transform duration-300">
-                      {store.images && store.images.length > 0 ? (
-                        <img
-                          src={store.images[0]}
-                          alt={`${store.storeName} banner`}
-                          className="w-full h-full object-cover"
-                          onError={(e: any) => {
-                            e.target.src = 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=500&h=300&fit=crop';
-                          }}
-                        />
-                      ) : (
-                        <div
-                          className={`w-full h-full flex items-center justify-center text-white text-4xl font-bold ${stringToBg(
-                            store.storeName
-                          )} shadow-lg`}
-                        >
-                          {getInitials(store.storeName)}
-                        </div>
-                      )}
-                      {store.isVerify && (
-                        <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-full p-1.5 shadow-lg z-10">
-                          <i className="pi pi-check text-sm font-bold"></i>
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300"></div>
-                    </div>
-
-                    {/* Store Info */}
-                    <div className="p-3 sm:p-4 flex flex-col gap-2 flex-1">
-                      {/* Store Name */}
-                      <div>
-                        <h4 className="text-sm md:text-base font-bold text-gray-900 line-clamp-1">
-                          {store.storeName}
-                        </h4>
-                        <p className="text-xs text-gray-600 line-clamp-1">
-                          Owner: <span className="font-medium">{store.userId?.name || 'N/A'}</span>
-                        </p>
-                      </div>
-
-                      {/* Details */}
-                      <div className="text-xs text-gray-700 space-y-1.5 flex-1">
-                        <p>
-                          <span className="font-semibold">📍</span>{' '}
-                          <span className="font-medium">{store.address?.area}</span>
-                          <br />
-                          <span className="text-gray-500 ml-6">{store.address?.state}, {store.address?.country}</span>
-                        </p>
-                        <p>
-                          <span className="font-semibold">📞</span>{' '}
-                          <a
-                            href={`tel:${store.contactNo}`}
-                            className="font-medium text-blue-600 hover:text-blue-700 hover:underline"
-                          >
-                            {store.contactNo}
-                          </a>
-                        </p>
-                        <p>
-                          <span className="font-semibold">📧</span>{' '}
-                          <a
-                            href={`mailto:${store.email}`}
-                            className="font-medium text-blue-600 hover:text-blue-700 hover:underline break-all"
-                          >
-                            {store.email}
-                          </a>
-                        </p>
-                        <p>
-                          <span className="font-semibold">⏰</span> {store.timing?.open} - {store.timing?.close}
-                        </p>
-                      </div>
-
-                      {/* Status & Action */}
-                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-200">
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${storeStatus.className}`}>
-                          {storeStatus.label}
-                        </span>
-                        <Link href={`/store/${store._id}`}>
-                          <Button
-                            icon="pi pi-arrow-right"
-                            rounded
-                            text
-                            className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 font-bold"
-                            title="View Details"
-                          />
-                        </Link>
-                      </div>
-                    </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              ))}
+              {filteredStores.map((store) => renderStoreCard(store))}
             </div>
           )}
         </div>

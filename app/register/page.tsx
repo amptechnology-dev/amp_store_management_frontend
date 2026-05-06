@@ -1,216 +1,343 @@
 "use client";
 
-import React from "react";
-import { useRouter } from "next/navigation";
+import React, { useState } from "react";
 import Link from "next/link";
-import { Button } from "primereact/button";
-import { ToastContainer } from "react-toastify";
-import StoreForm from "@/components/store/StoreForm";
+import { useRouter } from "next/navigation";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ToastContainer, toast } from "react-toastify";
+import axiosInstance from "@/service/axios.service";
+
+const registerSchema = z.object({
+	name: z.string().trim().min(2, "Name is required"),
+	email: z.string().trim().email("Enter a valid email address"),
+	phone: z.string().trim().min(10, "Phone number is required"),
+	password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
 	const router = useRouter();
+	const [showPassword, setShowPassword] = useState(false);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+
+	const {
+		register,
+		handleSubmit,
+		control,
+		reset,
+		formState: { errors },
+	} = useForm<RegisterFormValues>({
+		resolver: zodResolver(registerSchema),
+		defaultValues: {
+			name: "",
+			email: "",
+			phone: "",
+			password: "",
+		},
+	});
+
+	const onSubmit = async (values: RegisterFormValues) => {
+		setIsSubmitting(true);
+
+		try {
+			const payload = {
+				name: values.name.trim(),
+				email: values.email.trim(),
+				phone: values.phone.trim(),
+				password: values.password,
+			};
+
+			const response = await axiosInstance.post("/api/register/register-owner", payload);
+			toast.success(response.data?.message || "Registration successful");
+			reset();
+			setTimeout(() => {
+				router.push("/login");
+			}, 900);
+		} catch (error: any) {
+			toast.error(error?.response?.data?.message || "Registration failed. Please try again.");
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
 
 	return (
 		<main
 			style={{
 				minHeight: "100vh",
-				padding: "18px 12px",
+				padding: "20px 14px",
 				background:
-					"radial-gradient(850px 460px at 7% 10%, rgba(255, 205, 0, 0.28), transparent 60%), radial-gradient(760px 400px at 95% 90%, rgba(255, 187, 0, 0.2), transparent 60%), linear-gradient(170deg,#fffef6 0%, #fff8db 55%, #fff4c3 100%)",
+					"radial-gradient(900px 500px at 10% 0%, rgba(255, 205, 0, 0.24), transparent 58%), radial-gradient(700px 420px at 100% 100%, rgba(255, 181, 0, 0.18), transparent 55%), linear-gradient(180deg, #fffef9 0%, #fff7df 100%)",
+				display: "grid",
+				placeItems: "center",
 			}}
 		>
-			<section style={{ maxWidth: 1240, margin: "0 auto" }}>
+			<section style={{ width: "100%", maxWidth: 720 }}>
 				<div
 					style={{
-						borderRadius: 24,
+						borderRadius: 32,
 						overflow: "hidden",
-						border: "1px solid #f0e2af",
-						boxShadow: "0 12px 28px rgba(15,23,42,0.08)",
-						background: "linear-gradient(180deg,#ffffff,#fffdf4)",
+						border: "1px solid rgba(224, 172, 31, 0.25)",
+						boxShadow: "0 24px 70px rgba(15,23,42,0.10)",
+						background: "rgba(255,255,255,0.82)",
+						backdropFilter: "blur(14px)",
 					}}
 				>
 					<div
 						style={{
-							display: "grid",
-							gridTemplateColumns: "repeat(12, minmax(0, 1fr))",
-							minHeight: "calc(100vh - 36px)",
+							padding: "28px 22px",
+							background:
+								"linear-gradient(135deg, rgba(255, 248, 220, 0.98) 0%, rgba(255, 255, 255, 0.96) 55%, rgba(255, 241, 198, 0.92) 100%)",
+							borderBottom: "1px solid rgba(224, 172, 31, 0.16)",
 						}}
 					>
-						<div
-							style={{
-								gridColumn: "span 12",
-								padding: 24,
-								background:
-									"linear-gradient(180deg, rgba(255, 247, 204, 0.95) 0%, rgba(255, 253, 244, 0.98) 100%)",
-								borderBottom: "1px solid #f2e5b7",
-							}}
-						>
-							<div
-								style={{
-									display: "flex",
-									alignItems: "center",
-									justifyContent: "space-between",
-									gap: 16,
-									flexWrap: "wrap",
-								}}
-							>
-								<div>
-									<p style={{ margin: 0, color: "#a06f00", fontSize: 13, fontWeight: 700, letterSpacing: 1.2 }}>
-										AMP SHOPPING
-									</p>
-									<h1 style={{ margin: "6px 0 0", color: "#3b2e0e", fontSize: 34, fontWeight: 800 }}>
-										Register your store
-									</h1>
-									<p style={{ marginTop: 8, marginBottom: 0, color: "#6f5c2c", fontSize: 15, maxWidth: 760 }}>
-										Create your store profile with the same powerful form used in the dashboard, wrapped in a cleaner and more welcoming public experience.
-									</p>
-								</div>
-
-								<div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-									<Link href="/login" style={{ textDecoration: "none" }}>
-										<Button
-											type="button"
-											label="Back to Login"
-											icon="pi pi-sign-in"
-											outlined
-											style={{
-												borderColor: "#e0ac1f",
-												color: "#8a6711",
-												background: "#fffef9",
-											}}
-										/>
-									</Link>
-									<Link href="/" style={{ textDecoration: "none" }}>
-										<Button
-											type="button"
-											label="Home"
-											icon="pi pi-home"
-											text
-											style={{ color: "#8a6711" }}
-										/>
-									</Link>
-								</div>
+						<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+							<div>
+								<p style={{ margin: 0, color: "#a06f00", fontSize: 12, fontWeight: 800, letterSpacing: 2.4 }}>
+									AMP SHOPPING
+								</p>
+								<h1 style={{ margin: "10px 0 0", color: "#221b0f", fontSize: 36, fontWeight: 900, lineHeight: 1.1 }}>
+									Register your account
+								</h1>
+								<p style={{ marginTop: 10, marginBottom: 0, color: "#6f5c2c", fontSize: 15, maxWidth: 760, lineHeight: 1.7 }}>
+									Use this page for owner registration only. The store form keeps using its existing store-owner API.
+								</p>
 							</div>
-						</div>
 
-						<aside
-							style={{
-								gridColumn: "span 12",
-								padding: 24,
-								borderBottom: "1px solid #f2e5b7",
-							}}
-						>
-							<div
-								style={{
-									display: "grid",
-									gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-									gap: 14,
-								}}
-							>
-								{[
-									{
-										icon: "pi pi-check-circle",
-										title: "Same API flow",
-										text: "Uses the existing StoreForm submission logic and multipart payload structure.",
-									},
-									{
-										icon: "pi pi-mobile",
-										title: "Responsive design",
-										text: "The layout stays clean on mobile, tablet, and desktop.",
-									},
-									{
-										icon: "pi pi-shield",
-										title: "Verified onboarding",
-										text: "Built for a smoother store registration experience with validation and toasts.",
-									},
-								].map((item) => (
-									<div
-										key={item.title}
+							<div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+								<Link href="/login" style={{ textDecoration: "none" }}>
+									<button
+										type="button"
 										style={{
-											borderRadius: 18,
-											padding: 18,
-											background: "linear-gradient(180deg,#ffffff,#fffdf4)",
-											border: "1px solid #f0e2af",
-											boxShadow: "0 8px 18px rgba(15,23,42,0.04)",
+											height: 42,
+											padding: "0 14px",
+											borderRadius: 12,
+											border: "1px solid #e0ac1f",
+											background: "#fffef9",
+											color: "#8a6711",
+											fontWeight: 700,
+											cursor: "pointer",
 										}}
 									>
-										<div
-											style={{
-												width: 44,
-												height: 44,
-												borderRadius: 14,
-												display: "grid",
-												placeItems: "center",
-												background: "#fff6d4",
-												border: "1px solid #efd78a",
-												color: "#8a6a00",
-												fontSize: 18,
-												marginBottom: 12,
-											}}
-										>
-											<i className={item.icon}></i>
-										</div>
-										<h3 style={{ margin: 0, color: "#3b2e0e", fontSize: 18, fontWeight: 700 }}>{item.title}</h3>
-										<p style={{ margin: "8px 0 0", color: "#6f5c2c", fontSize: 14, lineHeight: 1.6 }}>
-											{item.text}
-										</p>
-									</div>
-								))}
+										Back to Login
+									</button>
+								</Link>
+								<Link href="/" style={{ textDecoration: "none" }}>
+									<button
+										type="button"
+										style={{
+											height: 42,
+											padding: "0 14px",
+											borderRadius: 12,
+											border: "1px solid transparent",
+											background: "transparent",
+											color: "#8a6711",
+											fontWeight: 700,
+											cursor: "pointer",
+										}}
+									>
+										Home
+									</button>
+								</Link>
 							</div>
-						</aside>
+						</div>
+					</div>
 
+					<div style={{ padding: 22 }}>
 						<div
 							style={{
-								gridColumn: "span 12",
-								padding: 24,
+								borderRadius: 22,
+								padding: 20,
+								background: "linear-gradient(180deg, #ffffff 0%, #fffdf7 100%)",
+								border: "1px solid rgba(224, 172, 31, 0.16)",
+								boxShadow: "0 10px 24px rgba(15,23,42,0.04)",
 							}}
 						>
-							<div
-								style={{
-									borderRadius: 20,
-									overflow: "hidden",
-									border: "1px solid #f0e2af",
-									boxShadow: "0 12px 28px rgba(15,23,42,0.08)",
-									background: "linear-gradient(180deg,#ffffff,#fffdf4)",
-								}}
-							>
-								<div style={{ padding: 24 }}>
-									<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-										<div>
-											<h2 style={{ margin: 0, color: "#3b2e0e", fontSize: 28, fontWeight: 800 }}>
-												Store Registration
-											</h2>
-											<p style={{ marginTop: 6, marginBottom: 0, color: "#6f5c2c", fontSize: 15 }}>
-												Fill in your store details below. The same fields and API flow are used across the dashboard.
-											</p>
-										</div>
-										<div
-											style={{
-												width: 52,
-												height: 52,
-												borderRadius: 16,
-												display: "grid",
-												placeItems: "center",
-												background: "#fff6d4",
-												border: "1px solid #efd78a",
-												color: "#8a6a00",
-												fontSize: 20,
-												fontWeight: 700,
-											}}
-										>
-											AMP
-										</div>
-									</div>
+							<p style={{ margin: 0, color: "#6f5c2c", fontSize: 14, lineHeight: 1.7 }}>
+								Fill in the details below to create your owner account. You’ll be redirected to login after successful registration.
+							</p>
+						</div>
+					</div>
 
-									<div style={{ marginTop: 18 }}>
-										<StoreForm
-											createEndpoint="/api/register/register-store-owner"
-											onClose={() => router.push("/login")}
-											onSuccess={() => router.push("/login")}
-										/>
+					<div style={{ padding: "0 22px 22px" }}>
+						<div
+							style={{
+								borderRadius: 24,
+								overflow: "hidden",
+								border: "1px solid rgba(224, 172, 31, 0.18)",
+								boxShadow: "0 14px 34px rgba(15,23,42,0.08)",
+								background: "linear-gradient(180deg, #ffffff 0%, #fffdf5 100%)",
+							}}
+						>
+							<div style={{ padding: 22, borderBottom: "1px solid rgba(224, 172, 31, 0.14)" }}>
+								<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+									<div>
+										<p style={{ margin: 0, color: "#a06f00", fontSize: 12, fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase" }}>
+											Owner Registration
+										</p>
+										<h2 style={{ margin: "8px 0 0", color: "#221b0f", fontSize: 28, fontWeight: 900 }}>
+											Create your owner account
+										</h2>
+										<p style={{ margin: "8px 0 0", color: "#6f5c2c", fontSize: 15, lineHeight: 1.7 }}>
+											This uses /api/register/register-owner with the exact owner payload.
+										</p>
+									</div>
+									<div
+										style={{
+											width: 54,
+											height: 54,
+											borderRadius: 18,
+											display: "grid",
+											placeItems: "center",
+											background: "#111827",
+											color: "#ffffff",
+											fontSize: 20,
+											fontWeight: 800,
+										}}
+									>
+										AMP
 									</div>
 								</div>
 							</div>
+
+							<form onSubmit={handleSubmit(onSubmit)} style={{ padding: 22, display: "grid", gap: 16 }}>
+								<div style={{ display: "grid", gap: 8 }}>
+									<label htmlFor="name" style={{ fontWeight: 700, color: "#4f3f16" }}>
+										Name
+									</label>
+									<input
+										id="name"
+										placeholder="Actovision"
+										autoComplete="name"
+										{...register("name")}
+										style={{
+											width: "100%",
+											height: 46,
+											borderRadius: 12,
+											border: errors.name ? "1px solid #ef4444" : "1px solid #e8d89f",
+											background: "#fffef9",
+											padding: "0 14px",
+											outline: "none",
+										}}
+									/>
+									{errors.name && <small style={{ color: "#dc2626", fontSize: 12 }}>{errors.name.message}</small>}
+								</div>
+
+								<div style={{ display: "grid", gap: 8 }}>
+									<label htmlFor="email" style={{ fontWeight: 700, color: "#4f3f16" }}>
+										Email
+									</label>
+									<input
+										id="email"
+										type="email"
+										placeholder="actovision@gmail.com"
+										autoComplete="email"
+										{...register("email")}
+										style={{
+											width: "100%",
+											height: 46,
+											borderRadius: 12,
+											border: errors.email ? "1px solid #ef4444" : "1px solid #e8d89f",
+											background: "#fffef9",
+											padding: "0 14px",
+											outline: "none",
+										}}
+									/>
+									{errors.email && <small style={{ color: "#dc2626", fontSize: 12 }}>{errors.email.message}</small>}
+								</div>
+
+								<div style={{ display: "grid", gap: 8 }}>
+									<label htmlFor="phone" style={{ fontWeight: 700, color: "#4f3f16" }}>
+										Phone
+									</label>
+									<input
+										id="phone"
+										type="tel"
+										placeholder="8017505010"
+										autoComplete="tel"
+										{...register("phone")}
+										style={{
+											width: "100%",
+											height: 46,
+											borderRadius: 12,
+											border: errors.phone ? "1px solid #ef4444" : "1px solid #e8d89f",
+											background: "#fffef9",
+											padding: "0 14px",
+											outline: "none",
+										}}
+									/>
+									{errors.phone && <small style={{ color: "#dc2626", fontSize: 12 }}>{errors.phone.message}</small>}
+								</div>
+
+								<div style={{ display: "grid", gap: 8 }}>
+									<label htmlFor="password" style={{ fontWeight: 700, color: "#4f3f16" }}>
+										Password
+									</label>
+									<Controller
+										name="password"
+										control={control}
+										render={({ field }) => (
+											<div style={{ position: "relative" }}>
+												<input
+													id="password"
+													type={showPassword ? "text" : "password"}
+													placeholder="8017505010"
+													autoComplete="new-password"
+													value={field.value || ""}
+													onChange={(event) => field.onChange(event.target.value)}
+													style={{
+														width: "100%",
+														height: 46,
+														borderRadius: 12,
+														border: errors.password ? "1px solid #ef4444" : "1px solid #e8d89f",
+														background: "#fffef9",
+														padding: "0 84px 0 14px",
+														outline: "none",
+													}}
+												/>
+												<button
+													type="button"
+													onClick={() => setShowPassword((value) => !value)}
+													style={{
+														position: "absolute",
+														right: 10,
+														top: "50%",
+														transform: "translateY(-50%)",
+														border: "none",
+														background: "transparent",
+														color: "#8a6711",
+														fontWeight: 700,
+														cursor: "pointer",
+													}}
+												>
+													{showPassword ? "Hide" : "Show"}
+												</button>
+											</div>
+										)}
+									/>
+									{errors.password && <small style={{ color: "#dc2626", fontSize: 12 }}>{errors.password.message}</small>}
+								</div>
+
+								<button
+									type="submit"
+									disabled={isSubmitting}
+									style={{
+										height: 48,
+										borderRadius: 12,
+										border: "1px solid #e0ac1f",
+										background: isSubmitting ? "linear-gradient(120deg,#f1d47e,#edcc6b)" : "linear-gradient(120deg,#f3be27,#e4a90e)",
+										color: "#3b2f0f",
+										fontWeight: 800,
+										fontSize: 16,
+										cursor: isSubmitting ? "not-allowed" : "pointer",
+										marginTop: 4,
+									}}
+								>
+									{isSubmitting ? "Creating account..." : "Create owner account"}
+								</button>
+							</form>
 						</div>
 					</div>
 				</div>

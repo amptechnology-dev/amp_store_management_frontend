@@ -15,14 +15,14 @@ export default function Home() {
       <section className="jd-simple-shell">
         <div className="jd-simple-card">
           <div className="jd-brand jd-simple-brand">
-            <Image src="/img/icons/icon-48x48.png" alt="Justdail" width={48} height={48} />
+            <Image src="/img/icons/icon-48x48.png" alt="Amp Store Management" width={48} height={48} />
             <div>
-              <h1>Justdail</h1>
+              <h1>Amp Store Management</h1>
               <p>Ecommerce Management System</p>
             </div>
           </div>
 
-          <h2>Welcome to Justdail</h2>
+          <h2>Welcome to Amp Store Management</h2>
           <p>
             Simple and reliable software for daily petrol pump operations.
             Manage sales, stock, workers, and billing from one place.
@@ -37,7 +37,7 @@ export default function Home() {
           <div className="jd-simple-image-wrap">
             <Image
               src="/img/avatars/avatar-1.jpg"
-              alt="Justdail Home"
+              alt="Amp Store Management Home"
               width={680}
               height={240}
               className="jd-simple-image"

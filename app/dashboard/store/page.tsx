@@ -9,6 +9,7 @@ import { Dialog } from "primereact/dialog";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { InputText } from "primereact/inputtext";
+import { Dropdown } from "primereact/dropdown";
 import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
@@ -36,6 +37,10 @@ function StoreListPage() {
     const [visible, setVisible] = useState(false);
     const [editStoreId, setEditStoreId] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<"card" | "table">("card");
+    const [rankVisible, setRankVisible] = useState(false);
+    const [rankStoreId, setRankStoreId] = useState<string | null>(null);
+    const [rankValue, setRankValue] = useState<number | null>(null);
+    const rankOptions = [1, 2, 3].map((rank) => ({ label: String(rank), value: rank }));
 
     const [pagination, setPagination] = useState({
         page: 1,
@@ -121,6 +126,41 @@ function StoreListPage() {
     const handleUpdate = (rowData: any) => {
         setEditStoreId(rowData._id);
         setVisible(true);
+    };
+
+    const openRankDialog = (rowData: any) => {
+        setRankStoreId(rowData._id);
+        setRankValue(typeof rowData.rank === "number" ? rowData.rank : rowData.rank ? Number(rowData.rank) : null);
+        setRankVisible(true);
+    };
+
+    const closeRankDialog = () => {
+        setRankVisible(false);
+        setRankStoreId(null);
+        setRankValue(null);
+    };
+
+    const handleRankUpdate = async () => {
+        if (!rankStoreId || rankValue === null || Number.isNaN(rankValue)) {
+            toast.error("Please enter a valid rank");
+            return;
+        }
+
+        if (rankValue < 1 || rankValue > 3) {
+            toast.error("Rank must be between 1 and 3");
+            return;
+        }
+
+        try {
+            const res = await axiosInstance.patch(`/api/register/update-store-rank/${rankStoreId}`, {
+                rank: rankValue,
+            });
+            toast.success(res.data.message || "Store rank updated successfully");
+            closeRankDialog();
+            await storeDataGet();
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || "Rank update failed");
+        }
     };
 
     const verifyStore = async (rowData: any) => {
@@ -256,14 +296,14 @@ function StoreListPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex gap-1 justify-between mt-auto pt-1">
+                    <div className="grid grid-cols-2 gap-2 mt-auto pt-1 md:grid-cols-4">
                         {profile?.role === "STORE" ? (
                             <>
                                 <Button
                                     icon="pi pi-pencil"
                                     label="Edit"
                                     onClick={() => handleUpdate(store)}
-                                    className="flex-1 text-xs"
+                                    className="w-full text-xs"
                                     style={{
                                         background: "#ffcf00",
                                         color: "#1d232f",
@@ -275,7 +315,7 @@ function StoreListPage() {
                                     icon="pi pi-trash"
                                     label="Delete"
                                     onClick={() => confirmDelete(store)}
-                                    className="flex-1 text-xs"
+                                    className="w-full text-xs"
                                     severity="danger"
                                     style={{
                                         padding: "4px 8px",
@@ -288,7 +328,7 @@ function StoreListPage() {
                                     icon="pi pi-pencil"
                                     label="Edit"
                                     onClick={() => handleUpdate(store)}
-                                    className="flex-1 text-xs"
+                                    className="w-full text-xs"
                                     style={{
                                         background: "#ffcf00",
                                         color: "#1d232f",
@@ -300,7 +340,7 @@ function StoreListPage() {
                                     icon="pi pi-trash"
                                     label="Delete"
                                     onClick={() => confirmDelete(store)}
-                                    className="flex-1 text-xs"
+                                    className="w-full text-xs"
                                     severity="danger"
                                     style={{
                                         padding: "4px 8px",
@@ -310,10 +350,22 @@ function StoreListPage() {
                                     icon={store.isVerify ? "pi pi-check-circle" : "pi pi-shield"}
                                     label="Verified"
                                     onClick={() => verifyStore(store)}
-                                    className="flex-1 text-xs"
+                                    className="w-full text-xs"
                                     style={{
                                         background: store.isVerify ? "#dcfce7" : "#dbeafe",
                                         color: store.isVerify ? "#166534" : "#1d4ed8",
+                                        border: "1px solid #e0ac1f",
+                                        padding: "4px 8px",
+                                    }}
+                                />
+                                <Button
+                                    icon="pi pi-sort-numeric-down"
+                                    label="Rank"
+                                    onClick={() => openRankDialog(store)}
+                                    className="w-full text-xs"
+                                    style={{
+                                        background: "#fff7db",
+                                        color: "#8a5b00",
                                         border: "1px solid #e0ac1f",
                                         padding: "4px 8px",
                                     }}
@@ -397,6 +449,18 @@ function StoreListPage() {
                         className="flex-1 text-xs"
                         severity="danger"
                         style={{
+                            padding: "4px 8px",
+                        }}
+                    />
+                    <Button
+                        icon="pi pi-sort-numeric-down"
+                        label="Rank"
+                        onClick={() => openRankDialog(rowData)}
+                        className="flex-1 text-xs"
+                        style={{
+                            background: "#fff7db",
+                            color: "#8a5b00",
+                            border: "1px solid #e0ac1f",
                             padding: "4px 8px",
                         }}
                     />
@@ -500,6 +564,11 @@ function StoreListPage() {
         </div>
     );
 
+    const isStoreAddMode = profile?.role === "STORE" && !editStoreId;
+    const storeCreateEndpoint = isStoreAddMode
+        ? "/api/register/create-store"
+        : "/api/register/create-user";
+
     return (
         <div className="w-full flex justify-start items-start pt-2">
             <div className="w-full bg-white rounded-lg shadow p-2 sm:p-4">
@@ -514,7 +583,7 @@ function StoreListPage() {
                 {/* Card View */}
                 {viewMode === "card" && storeData.length > 0 && (
                     <div className="p-2 sm:p-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
                             {storeData.map((store) => (
                                 <div key={store._id} className="w-full">
                                     {storeCardTemplate(store)}
@@ -626,6 +695,8 @@ function StoreListPage() {
                 >
                     <StoreForm
                         storeId={editStoreId}
+                        mode={isStoreAddMode ? "store" : "admin"}
+                        createEndpoint={storeCreateEndpoint}
                         onClose={() => {
                             setVisible(false);
                             setEditStoreId(null);
@@ -636,6 +707,50 @@ function StoreListPage() {
                             setEditStoreId(null);
                         }}
                     />
+                </Dialog>
+
+                <Dialog
+                    header="Update Store Rank"
+                    visible={rankVisible}
+                    style={{ width: "28rem" }}
+                    contentStyle={{ overflow: "visible" }}
+                    onHide={closeRankDialog}
+                >
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-gray-700">
+                                Rank <span className="text-red-500">*</span>
+                            </label>
+                            <Dropdown
+                                value={rankValue}
+                                onChange={(e) => setRankValue((e.value as number | null) ?? null)}
+                                options={rankOptions}
+                                placeholder="Select rank"
+                                className="w-full"
+                                panelClassName="!text-sm"
+                            />
+                            <p className="text-xs text-gray-500">Choose a rank from the dropdown.</p>
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <Button
+                                type="button"
+                                label="Cancel"
+                                icon="pi pi-times"
+                                onClick={closeRankDialog}
+                                className="flex-1"
+                                style={{ background: "#f5f5f5", color: "#666", border: "1px solid #ddd" }}
+                            />
+                            <Button
+                                type="button"
+                                label="Update Rank"
+                                icon="pi pi-check"
+                                onClick={handleRankUpdate}
+                                className="flex-1"
+                                style={{ background: "#f3be27", color: "#3b2f0f", border: "1px solid #e0ac1f" }}
+                            />
+                        </div>
+                    </div>
                 </Dialog>
 
                 <ConfirmDialog />

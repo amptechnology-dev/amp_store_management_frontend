@@ -1,14 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Button } from 'primereact/button';
 import Link from 'next/link';
 
-interface HeaderProps {
-  onLoginClick: () => void;
-}
-
-export default function Header({ onLoginClick }: HeaderProps) {
+export default function Header() {
   return (
     <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
@@ -22,20 +17,20 @@ export default function Header({ onLoginClick }: HeaderProps) {
               <p className="text-xs text-gray-600 hidden sm:block">Best Deals Daily</p>
             </div>
           </div>
-          <Link href="#">
-            <Button
-              label="Login"
-              icon="pi pi-sign-in"
-              onClick={onLoginClick}
-              className="w-auto"
-              style={{
-                background: 'linear-gradient(120deg, #fbbf24, #f59e0b)',
-                border: 'none',
-                color: '#fff',
-                fontWeight: '600',
-              }}
-            />
-          </Link>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center rounded-lg border border-yellow-500 px-4 py-2 text-sm font-semibold text-yellow-700 transition-colors hover:bg-yellow-50"
+            >
+              Login
+            </Link>
+            <Link
+              href="/register"
+              className="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition-transform hover:-translate-y-0.5"
+            >
+              Register
+            </Link>
+          </div>
         </div>
       </div>
     </nav>

@@ -176,7 +176,7 @@ export default function StoreDetails() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-amber-50 flex flex-col">
-        <Header onLoginClick={() => setShowLoginModal(true)} />
+        <Header />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <i className="pi pi-spin pi-spinner text-5xl text-yellow-600 mb-4 block"></i>
@@ -191,7 +191,7 @@ export default function StoreDetails() {
   if (error || !store) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-amber-50 flex flex-col">
-        <Header onLoginClick={() => setShowLoginModal(true)} />
+        <Header />
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="text-center max-w-md">
             <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-6">
@@ -228,7 +228,7 @@ export default function StoreDetails() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-amber-50 flex flex-col">
       {/* Header */}
-      <Header onLoginClick={() => setShowLoginModal(true)} />
+      <Header />
 
       {/* Main Content */}
       <main className="flex-1 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
