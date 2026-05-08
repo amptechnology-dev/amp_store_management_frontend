@@ -7,6 +7,7 @@ import "primereact/resources/themes/bootstrap4-light-blue/theme.css";
 import "primereact/resources/primereact.min.css";
 import 'primeicons/primeicons.css';
 import { PrimeReactProvider } from "primereact/api";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 
 
 const geistSans = Geist({
@@ -61,9 +62,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <PrimeReactProvider>
-          <StoreProvider>{children}</StoreProvider>
-        </PrimeReactProvider>
+        <GoogleOAuthProvider
+          clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}
+        >
+          <PrimeReactProvider>
+            <StoreProvider>{children}</StoreProvider>
+          </PrimeReactProvider>
+        </GoogleOAuthProvider>
 
         {/* Load AdminKit app JS after hydration so DOM is ready */}
         <Script src="/js/app.js" strategy="afterInteractive" />

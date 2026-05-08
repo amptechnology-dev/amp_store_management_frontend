@@ -10,6 +10,9 @@ import axiosInstance from '@/service/axios.service'
 import { useAppDispatch } from "@/lib/store/hooks"
 import { tokenSlice } from "../../lib/store/features/storeToken"
 
+const AUTH_TOKEN_KEY = 'login-token';
+const AUTH_USER_KEY = 'login-user';
+
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
@@ -39,7 +42,29 @@ export default function LoginPage() {
       console.log("My token...", token);
 
       dispatch(tokenSlice.actions.saveToken(token));
-      localStorage.setItem("login-token", res.data.token);
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+
+      try {
+        const profileResponse = await axiosInstance.get('/api/login/profile-page');
+        const user = profileResponse.data?.user;
+
+        if (user) {
+          localStorage.setItem(
+            AUTH_USER_KEY,
+            JSON.stringify({
+              id: user._id || user.id,
+              name: user.name || user.email || 'User',
+              email: user.email || '',
+              role: user.role,
+              picture: user.picture,
+            })
+          );
+        }
+      } catch (profileError) {
+        console.error('Unable to load profile after login:', profileError);
+      }
+
+      window.dispatchEvent(new Event('auth-changed'));
       console.log("Response...", res)
       router.push("/dashboard/store");
     } catch (error: any) {
