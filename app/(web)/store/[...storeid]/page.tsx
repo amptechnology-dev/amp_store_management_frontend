@@ -2,13 +2,19 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { Button } from 'primereact/button';
 import { Carousel } from 'primereact/carousel';
 import { Chip } from 'primereact/chip';
 import Link from 'next/link';
 import axiosInstance from '@/service/axios.service';
+import { useAppDispatch } from '@/lib/store/hooks';
+import { tokenSlice } from '@/lib/store/features/storeToken';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
+
+const AUTH_TOKEN_KEY = 'login-token';
+const AUTH_USER_KEY = 'login-user';
 
 interface Product {
   _id: string;
@@ -102,7 +108,36 @@ interface StoreDetailsResponse {
   products: Product[];
 }
 
+interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role?: string;
+  picture?: string;
+}
+
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+const readStoredUser = (): AuthUser | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(AUTH_USER_KEY);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeUser = (user: any): AuthUser => ({
+  id: user?.id || user?._id || '',
+  name: user?.name || user?.email || 'User',
+  email: user?.email || '',
+  role: user?.role,
+  picture: user?.picture,
+});
 
 const parseStoreTimeToMinutes = (value: string) => {
   const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
@@ -198,6 +233,7 @@ const quickFactCard = (label: string, value: string, tone: string) => (
 export default function StoreDetails() {
   const params = useParams();
   const storeId = params?.storeid?.[0];
+  const dispatch = useAppDispatch();
 
   const [store, setStore] = useState<Store | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -210,14 +246,107 @@ export default function StoreDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const fetchReviews = async (currentStoreId: string) => {
     const reviewResponse = await axiosInstance.get(`/api/review/store-reviews/${currentStoreId}`);
     setReviews(reviewResponse.data?.reviews || []);
   };
 
+  const syncAuthState = async () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
+    const storedUser = readStoredUser();
+
+    if (!token) {
+      setAuthUser(null);
+      setAuthReady(true);
+      return;
+    }
+
+    dispatch(tokenSlice.actions.saveToken(token));
+
+    if (storedUser?.name) {
+      setAuthUser(storedUser);
+      setAuthReady(true);
+      return;
+    }
+
+    try {
+      const response = await axiosInstance.get('/api/login/profile-page');
+      const resolvedUser = normalizeUser(response.data?.user);
+
+      window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify(resolvedUser));
+      setAuthUser(resolvedUser);
+    } catch {
+      setAuthUser(null);
+    } finally {
+      setAuthReady(true);
+    }
+  };
+
+  const handleGoogleSuccess = async (response: CredentialResponse) => {
+    const token = response.credential;
+
+    if (!token) {
+      return;
+    }
+
+    setGoogleLoading(true);
+
+    try {
+      const result = await axiosInstance.post('/api/login/continue-with-google', { token });
+      const accessToken = result.data.token;
+      const normalizedUser = normalizeUser(result.data.user);
+
+      dispatch(tokenSlice.actions.saveToken(accessToken));
+      window.localStorage.setItem(AUTH_TOKEN_KEY, accessToken);
+      window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify(normalizedUser));
+      setAuthUser(normalizedUser);
+      window.dispatchEvent(new Event('auth-changed'));
+    } catch (error) {
+      console.error('Google login failed:', error);
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setMounted(true);
+    void syncAuthState();
+
+    const handleAuthChanged = () => {
+      void syncAuthState();
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === AUTH_TOKEN_KEY || event.key === AUTH_USER_KEY) {
+        void syncAuthState();
+      }
+    };
+
+    window.addEventListener('auth-changed', handleAuthChanged);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('auth-changed', handleAuthChanged);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
   useEffect(() => {
     const fetchStoreDetails = async () => {
+      if (!authReady || !authUser) {
+        setLoading(false);
+        return;
+      }
+
       if (!storeId) {
         setError('Store not found');
         setLoading(false);
@@ -253,7 +382,75 @@ export default function StoreDetails() {
     };
 
     fetchStoreDetails();
-  }, [storeId]);
+  }, [storeId, authReady, authUser]);
+
+  if (!mounted || !authReady) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-amber-50 flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <i className="pi pi-spin pi-spinner text-5xl text-yellow-600 mb-4 block"></i>
+            <p className="text-lg font-semibold text-gray-600">Checking sign-in status...</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return (
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.16),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(244,114,182,0.10),_transparent_30%),linear-gradient(180deg,_#fffdf7_0%,_#ffffff_36%,_#fff7ed_100%)] text-slate-900">
+        <Header />
+
+        <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+          <div className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm" aria-hidden="true" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="store-access-title"
+            className="relative z-50 w-full max-w-xl overflow-hidden rounded-[2rem] border border-white/80 bg-white/88 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.16)] backdrop-blur-xl sm:p-8"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-100/60 via-white/20 to-rose-100/50" />
+            <div className="relative text-center">
+              <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-slate-950 text-white shadow-lg">
+                <i className="pi pi-lock text-3xl" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-amber-600">Sign in required</p>
+              <h1 id="store-access-title" className="mt-3 text-3xl font-black text-slate-950 sm:text-4xl">Continue with Google to view this store</h1>
+              <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-slate-600 sm:text-base">
+                Store details are private until you sign in. Use Google sign-in to continue and the page will load automatically after authentication.
+              </p>
+
+              <div className="mt-8 rounded-[1.5rem] border border-amber-100 bg-white p-5 shadow-sm">
+                <div className="flex flex-col items-center gap-4">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={() => console.error('Google login was cancelled or failed')}
+                    text="continue_with"
+                    shape="pill"
+                    theme="outline"
+                    size="large"
+                    width="320"
+                  />
+
+                  {googleLoading && (
+                    <div className="inline-flex items-center gap-2 rounded-full bg-yellow-50 px-4 py-2 text-sm font-semibold text-yellow-800">
+                      <i className="pi pi-spin pi-spinner" />
+                      Signing in with Google...
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <Footer />
+      </div>
+    );
+  }
 
   if (loading) {
     return (

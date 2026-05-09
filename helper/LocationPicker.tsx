@@ -22,6 +22,7 @@ type LocationPickerProps = {
   longitude: number;
   center?: [number, number];
   onPick: (latitude: number, longitude: number) => void;
+  selectedLocation?: string;
 };
 
 function MapClickListener({ onPick }: { onPick: LocationPickerProps["onPick"] }) {
@@ -59,7 +60,7 @@ function RecenterOnChange({
   return null;
 }
 
-export default function LocationPicker({ latitude, longitude, center, onPick }: LocationPickerProps) {
+export default function LocationPicker({ latitude, longitude, center, onPick, selectedLocation }: LocationPickerProps) {
   const hasPoint =
     Number.isFinite(latitude) &&
     Number.isFinite(longitude) &&
@@ -67,7 +68,17 @@ export default function LocationPicker({ latitude, longitude, center, onPick }: 
   const mapCenter: [number, number] = center || (hasPoint ? [latitude, longitude] : INDIA_CENTER);
 
   return (
-    <div style={{ position: "relative", height: 320, width: "100%", borderRadius: 22, overflow: "hidden" }}>
+    <div
+      style={{
+        position: "relative",
+        height: 420,
+        width: "100%",
+        borderRadius: 24,
+        overflow: "hidden",
+        border: "1px solid rgba(224, 172, 31, 0.18)",
+        boxShadow: "0 18px 40px rgba(15,23,42,0.10)",
+      }}
+    >
       <MapContainer
         center={mapCenter}
         zoom={hasPoint ? 13 : 5}
@@ -102,19 +113,46 @@ export default function LocationPicker({ latitude, longitude, center, onPick }: 
           left: 14,
           top: 14,
           zIndex: 500,
-          background: "rgba(255,255,255,0.92)",
+          background: "rgba(255,255,255,0.96)",
           border: "1px solid rgba(224, 172, 31, 0.18)",
-          boxShadow: "0 10px 24px rgba(15,23,42,0.12)",
-          borderRadius: 14,
-          padding: "10px 12px",
-          maxWidth: 220,
+          boxShadow: "0 12px 28px rgba(15,23,42,0.12)",
+          borderRadius: 16,
+          padding: "12px 14px",
+          maxWidth: 280,
         }}
       >
         <div style={{ fontSize: 12, fontWeight: 800, color: "#a06f00", letterSpacing: 1.2, textTransform: "uppercase" }}>
-          Location picker
+          Detailed location map
         </div>
         <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.5, color: "#5f6b7a" }}>
-          Click or drag the marker to update area and coordinates.
+          Search a street, locality, landmark, or house number, then click or drag the marker to fine-tune the point.
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
+          left: 14,
+          right: 14,
+          bottom: 14,
+          zIndex: 500,
+          background: "rgba(17, 24, 39, 0.90)",
+          border: "1px solid rgba(255,255,255,0.12)",
+          boxShadow: "0 18px 36px rgba(15,23,42,0.22)",
+          borderRadius: 18,
+          padding: "12px 14px",
+          color: "#ffffff",
+          backdropFilter: "blur(10px)",
+        }}
+      >
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.3, textTransform: "uppercase", color: "#f3be27" }}>
+          Selected location
+        </div>
+        <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5, fontWeight: 600 }}>
+          {selectedLocation || "No detailed location selected yet"}
+        </div>
+        <div style={{ marginTop: 6, fontSize: 12, color: "rgba(255,255,255,0.72)" }}>
+          Lat {Number(latitude).toFixed(6)} | Long {Number(longitude).toFixed(6)}
         </div>
       </div>
     </div>

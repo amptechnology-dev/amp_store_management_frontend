@@ -21,6 +21,8 @@ interface Store {
   _id: string;
   storeName: string;
   storeType: string;
+  isFeatured?: boolean;
+  viewCount?: number;
   userId: {
     _id: string;
     name: string;
@@ -48,7 +50,6 @@ interface Store {
   isActive: boolean;
   isVerify: boolean;
   storeUniqueId: string;
-  rank?: number;
   reviews?: StoreReview[];
   createdAt?: string;
 }
@@ -57,12 +58,14 @@ type FeedMode =
   | 'all'
   | 'featured'
   | 'newest'
+  | 'topViewed'
   | 'popular'
   | 'topRated'
   | 'nearby'
-  | 'sponsored'
   | 'gst'
   | 'random';
+
+type ViewCountFilter = 'all' | '1' | '5' | '10' | '20';
 
 type LocationPoint = {
   latitude: number;
@@ -73,15 +76,50 @@ const fallbackImage = 'https://images.unsplash.com/photo-1568605114967-8130f3a36
 
 const feedModes: Array<{ key: FeedMode; label: string; description: string; icon: string }> = [
   { key: 'all', label: 'All Stores', description: 'Show everything', icon: 'pi-th-large' },
-  { key: 'featured', label: 'Featured Stores', description: 'Promoted or trusted', icon: 'pi-star' },
+  { key: 'featured', label: 'Featured Stores', description: 'Promoted or trusted', icon: 'pi-star-fill' },
   { key: 'newest', label: 'Newest Stores', description: 'Freshly opened', icon: 'pi-clock' },
+  { key: 'topViewed', label: 'Top Viewed', description: 'Most watched stores', icon: 'pi-eye' },
   { key: 'popular', label: 'Popular Stores', description: 'Viewed and loved', icon: 'pi-chart-line' },
   { key: 'topRated', label: 'Top Rated Stores', description: 'Best reviews', icon: 'pi-thumbs-up' },
   { key: 'nearby', label: 'Nearby Stores', description: 'Around your location', icon: 'pi-map-marker' },
-  { key: 'sponsored', label: 'Sponsored Stores', description: 'Higher promotion rank', icon: 'pi-bolt' },
   { key: 'gst', label: 'GST Verified', description: 'Tax verified shops', icon: 'pi-id-card' },
   { key: 'random', label: 'Explore Random', description: 'Discover something new', icon: 'pi-refresh' },
 ];
+
+const viewCountFilters: Array<{ key: ViewCountFilter; label: string; description: string }> = [
+  { key: 'all', label: 'All views', description: 'No view filter' },
+  { key: '1', label: '1+ views', description: 'At least one view' },
+  { key: '5', label: '5+ views', description: 'Moderately watched' },
+  { key: '10', label: '10+ views', description: 'Well watched' },
+  { key: '20', label: '20+ views', description: 'Highly watched' },
+];
+
+const STATE_LABEL_ALIASES: Record<string, string> = {
+  westbengal: 'West Bengal',
+};
+
+const normalizeText = (value: unknown) =>
+  String(value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
+
+const titleCaseWords = (value: string) =>
+  value
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+
+const canonicalizeState = (value?: string) => {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const normalized = normalizeText(trimmed);
+  return STATE_LABEL_ALIASES[normalized] || titleCaseWords(trimmed);
+};
 
 const parseStoreTimeToMinutes = (value: string) => {
   const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
@@ -153,6 +191,21 @@ const getAverageRating = (store: Store) => {
 
 const getReviewCount = (store: Store) => store.reviews?.length || 0;
 
+const renderRatingStars = (rating: number) => {
+  const roundedRating = Math.max(0, Math.min(5, rating));
+
+  return Array.from({ length: 5 }, (_, index) => {
+    const filled = index < Math.round(roundedRating);
+
+    return (
+      <i
+        key={index}
+        className={`pi ${filled ? 'pi-star-fill' : 'pi-star'} text-[0.72rem] ${filled ? 'text-amber-500' : 'text-slate-300'}`}
+      />
+    );
+  });
+};
+
 const getInitials = (name: string) => {
   const pieces = name.split(' ').filter(Boolean);
 
@@ -183,29 +236,21 @@ const stringToBg = (str: string) => {
   return colors[index];
 };
 
-const getStoreRank = (store: Store) => {
-  const rank = toNumber(store.rank, 3);
-  return rank > 0 ? rank : 3;
-};
-
 const hasGst = (store: Store) => Boolean((store as Store & { gstin?: string }).gstin?.trim());
 
-const isSponsoredStore = (store: Store) => getStoreRank(store) <= 1;
+const isFeaturedStore = (store: Store) => Boolean(store.isFeatured);
 
-const isFeaturedStore = (store: Store) => store.isVerify && getStoreRank(store) <= 2;
-
-const getPriorityScore = (store: Store) => {
-  const rank = getStoreRank(store);
+const getStoreDiscoveryScore = (store: Store) => {
   const rating = getAverageRating(store);
   const reviewCount = getReviewCount(store);
   const ageInDays = Math.max(0, (Date.now() - toTimestamp(store.createdAt)) / 86400000);
   const recencyBonus = Math.max(0, 80 - ageInDays);
 
   return (
+    (store.isFeatured ? 70 : 0) +
     (store.isVerify ? 60 : 0) +
     (hasGst(store) ? 12 : 0) +
     (store.isActive ? 8 : 0) +
-    (4 - Math.min(rank, 4)) * 12 +
     rating * 15 +
     Math.min(reviewCount, 20) * 2 +
     recencyBonus
@@ -221,7 +266,7 @@ const getPopularityScore = (store: Store) => {
 };
 
 const getDistanceKm = (userLocation: LocationPoint, store: Store) => {
-  if (!Number.isFinite(store.lat) || !Number.isFinite(store.long)) {
+  if (!Number.isFinite(store.lat) || !Number.isFinite(store.long) || (store.lat === 0 && store.long === 0)) {
     return null;
   }
 
@@ -256,14 +301,14 @@ const sortRandomly = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0
 function StoreCard({ store, userLocation }: { store: Store; userLocation: LocationPoint | null }) {
   const rating = getAverageRating(store);
   const reviewCount = getReviewCount(store);
+  const viewCount = toNumber(store.viewCount);
   const distance = userLocation ? getDistanceKm(userLocation, store) : null;
   const openNow = store.isActive && isStoreOpenNow(store.timing?.open || '', store.timing?.close || '');
-  const storeRank = getStoreRank(store);
-  const summary = [store.storeType, store.address?.state, store.address?.area].filter(Boolean).join(' • ');
+  const ownerName = store.userId?.name || 'Owner not set';
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-[1.8rem] border border-white/80 bg-white/95 shadow-[0_18px_44px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_rgba(15,23,42,0.14)]">
-      <div className="relative h-44 overflow-hidden bg-slate-100">
+    <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-[2rem] border border-white/80 bg-white/95 shadow-[0_18px_44px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_rgba(15,23,42,0.14)]">
+      <div className="relative h-52 overflow-hidden bg-slate-100 sm:h-56">
         {store.images?.length > 0 ? (
           <img
             src={store.images[0]}
@@ -290,11 +335,6 @@ function StoreCard({ store, userLocation }: { store: Store; userLocation: Locati
               Featured
             </span>
           )}
-          {isSponsoredStore(store) && (
-            <span className="rounded-full bg-gradient-to-r from-rose-500 to-orange-500 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white shadow-lg">
-              Sponsored
-            </span>
-          )}
           {hasGst(store) && (
             <span className="rounded-full bg-emerald-500/95 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white shadow-lg">
               GST Verified
@@ -303,9 +343,6 @@ function StoreCard({ store, userLocation }: { store: Store; userLocation: Locati
         </div>
 
         <div className="absolute right-3 top-3 flex flex-col items-end gap-2">
-          <span className="rounded-full bg-slate-950/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur-sm">
-            Rank {storeRank}
-          </span>
           {distance !== null && (
             <span className="rounded-full bg-white/95 px-3 py-1 text-[11px] font-semibold text-slate-800 shadow-lg">
               {formatDistance(distance)}
@@ -314,42 +351,39 @@ function StoreCard({ store, userLocation }: { store: Store; userLocation: Locati
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 p-4 sm:p-5">
+      <div className="flex flex-1 flex-col gap-4 p-5 sm:p-6">
         <div className="space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <h4 className="truncate text-[1.05rem] font-extrabold text-slate-950 sm:text-lg">{store.storeName}</h4>
-              <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                {summary || 'General store'}
+              <h4 className="text-[1.08rem] font-extrabold leading-snug text-slate-950 sm:text-[1.18rem]">{store.storeName}</h4>
+              <p className="mt-2 text-sm font-medium text-slate-700">
+                Owner: <span className="font-semibold text-slate-950">{ownerName}</span>
               </p>
             </div>
             <div
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
-                openNow ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-              }`}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${openNow ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                }`}
             >
               <span className={`h-2 w-2 rounded-full ${openNow ? 'bg-emerald-500' : 'bg-rose-500'}`} />
               {openNow ? 'Open now' : 'Closed'}
             </div>
           </div>
 
-          <p className="line-clamp-2 text-sm leading-6 text-slate-600">
-            {store.description || 'A trusted local store with useful products and easy contact options.'}
-          </p>
-
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-              {reviewCount > 0 ? `${rating.toFixed(1)} rating` : 'No ratings yet'}
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+              <span className="inline-flex items-center gap-0.5">{renderRatingStars(rating)}</span>
+              <span>{reviewCount > 0 ? rating.toFixed(1) : 'No ratings yet'}</span>
             </span>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-              {store.address?.area || 'Area pending'}
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+              <i className="pi pi-eye" />
+              {viewCount} {viewCount === 1 ? 'view' : 'views'}
             </span>
             {hasGst(store) && <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">GST</span>}
           </div>
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <p className="text-xs font-medium text-slate-500">
+          <p className="min-w-0 text-xs font-medium text-slate-500">
             {store.address?.state || 'State not set'}{store.address?.country ? `, ${store.address.country}` : ''}
           </p>
 
@@ -359,7 +393,7 @@ function StoreCard({ store, userLocation }: { store: Store; userLocation: Locati
               icon="pi pi-arrow-right"
               iconPos="right"
               rounded
-              className="border-none bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5"
+              className="border-none bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5"
             />
           </Link>
         </div>
@@ -371,9 +405,11 @@ function StoreCard({ store, userLocation }: { store: Store; userLocation: Locati
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFeed, setActiveFeed] = useState<FeedMode>('all');
+  const [selectedViewCount, setSelectedViewCount] = useState<ViewCountFilter>('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedState, setSelectedState] = useState('all');
   const [selectedArea, setSelectedArea] = useState('all');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [allStores, setAllStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -431,33 +467,75 @@ export default function Home() {
     );
   };
 
+  useEffect(() => {
+    requestLocation();
+  }, []);
+
   const uniqueCategories = useMemo(
-    () => Array.from(new Set(allStores.map((store) => store.storeType).filter(Boolean))).sort(),
+    () => Array.from(new Set(allStores.map((store) => store.storeType?.trim()).filter(Boolean))).sort(),
     [allStores]
   );
 
   const uniqueStates = useMemo(
-    () => Array.from(new Set(allStores.map((store) => store.address?.state).filter(Boolean))).sort(),
+    () => {
+      const stateMap = new Map<string, string>();
+
+      allStores.forEach((store) => {
+        const stateLabel = canonicalizeState(store.address?.state);
+        if (!stateLabel) {
+          return;
+        }
+
+        const normalizedState = normalizeText(stateLabel);
+        if (!stateMap.has(normalizedState)) {
+          stateMap.set(normalizedState, stateLabel);
+        }
+      });
+
+      return Array.from(stateMap.values()).sort((left, right) => left.localeCompare(right));
+    },
     [allStores]
   );
 
   const uniqueAreas = useMemo(() => {
     const scopedStores = selectedState === 'all'
       ? allStores
-      : allStores.filter((store) => store.address?.state === selectedState);
+      : allStores.filter((store) => normalizeText(canonicalizeState(store.address?.state)) === normalizeText(selectedState));
 
-    return Array.from(new Set(scopedStores.map((store) => store.address?.area).filter(Boolean))).sort();
+    const areaMap = new Map<string, string>();
+
+    scopedStores.forEach((store) => {
+      const areaLabel = store.address?.area?.trim();
+      if (!areaLabel) {
+        return;
+      }
+
+      const normalizedArea = normalizeText(areaLabel);
+      if (!areaMap.has(normalizedArea)) {
+        areaMap.set(normalizedArea, areaLabel);
+      }
+    });
+
+    return Array.from(areaMap.values()).sort((left, right) => left.localeCompare(right));
   }, [allStores, selectedState]);
 
   useEffect(() => {
     setSelectedArea('all');
   }, [selectedState]);
 
+  useEffect(() => {
+    setIsFiltersOpen(false);
+  }, [activeFeed, searchQuery, selectedCategory, selectedState, selectedArea, userLocation]);
+
   const baseFilteredStores = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = normalizeText(searchQuery);
+    const selectedCategoryKey = normalizeText(selectedCategory);
+    const selectedStateKey = selectedState === 'all' ? '' : normalizeText(selectedState);
+    const selectedAreaKey = selectedArea === 'all' ? '' : normalizeText(selectedArea);
+    const selectedViewCountValue = selectedViewCount === 'all' ? null : Number(selectedViewCount);
 
     return allStores.filter((store) => {
-      const searchableFields = [
+      const searchableFields = normalizeText([
         store.storeName,
         store.storeType,
         store.address?.area,
@@ -467,37 +545,42 @@ export default function Home() {
         store.userId?.name,
       ]
         .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
+        .join(' '));
 
       if (query && !searchableFields.includes(query)) {
         return false;
       }
 
-      if (selectedCategory !== 'all' && store.storeType !== selectedCategory) {
+      if (selectedCategory !== 'all' && normalizeText(store.storeType) !== selectedCategoryKey) {
         return false;
       }
 
-      if (selectedState !== 'all' && store.address?.state !== selectedState) {
+      if (selectedState !== 'all' && normalizeText(canonicalizeState(store.address?.state)) !== selectedStateKey) {
         return false;
       }
 
-      if (selectedArea !== 'all' && store.address?.area !== selectedArea) {
+      if (selectedArea !== 'all' && normalizeText(store.address?.area) !== selectedAreaKey) {
+        return false;
+      }
+
+      if (selectedViewCountValue !== null && toNumber(store.viewCount) < selectedViewCountValue) {
         return false;
       }
 
       return true;
     });
-  }, [allStores, searchQuery, selectedCategory, selectedState, selectedArea]);
+  }, [allStores, searchQuery, selectedCategory, selectedState, selectedArea, selectedViewCount]);
 
   const visibleStores = useMemo(() => {
     const stores = [...baseFilteredStores];
 
     switch (activeFeed) {
       case 'featured':
-        return stores.filter((store) => isFeaturedStore(store)).sort((left, right) => getPriorityScore(right) - getPriorityScore(left));
+        return stores.filter((store) => isFeaturedStore(store)).sort((left, right) => getStoreDiscoveryScore(right) - getStoreDiscoveryScore(left));
       case 'newest':
         return stores.sort((left, right) => toTimestamp(right.createdAt) - toTimestamp(left.createdAt));
+      case 'topViewed':
+        return stores.sort((left, right) => toNumber(right.viewCount) - toNumber(left.viewCount));
       case 'popular':
         return stores.sort((left, right) => getPopularityScore(right) - getPopularityScore(left));
       case 'topRated':
@@ -513,7 +596,7 @@ export default function Home() {
           });
       case 'nearby':
         if (!userLocation) {
-          return stores.sort((left, right) => getPriorityScore(right) - getPriorityScore(left));
+          return stores.sort((left, right) => getStoreDiscoveryScore(right) - getStoreDiscoveryScore(left));
         }
 
         return stores.sort((left, right) => {
@@ -521,20 +604,18 @@ export default function Home() {
           const rightDistance = getDistanceKm(userLocation, right) ?? Number.POSITIVE_INFINITY;
           return leftDistance - rightDistance;
         });
-      case 'sponsored':
-        return stores.filter((store) => isSponsoredStore(store)).sort((left, right) => getPriorityScore(right) - getPriorityScore(left));
       case 'gst':
-        return stores.filter((store) => hasGst(store)).sort((left, right) => getPriorityScore(right) - getPriorityScore(left));
+        return stores.filter((store) => hasGst(store)).sort((left, right) => getStoreDiscoveryScore(right) - getStoreDiscoveryScore(left));
       case 'random':
         return sortRandomly(stores);
       case 'all':
       default:
-        return stores.sort((left, right) => getPriorityScore(right) - getPriorityScore(left));
+        return stores.sort((left, right) => getStoreDiscoveryScore(right) - getStoreDiscoveryScore(left));
     }
   }, [baseFilteredStores, activeFeed, userLocation]);
 
   const featuredCount = useMemo(() => allStores.filter((store) => isFeaturedStore(store)).length, [allStores]);
-  const sponsoredCount = useMemo(() => allStores.filter((store) => isSponsoredStore(store)).length, [allStores]);
+  const verifiedCount = useMemo(() => allStores.filter((store) => store.isVerify).length, [allStores]);
   const gstCount = useMemo(() => allStores.filter((store) => hasGst(store)).length, [allStores]);
   const topRatedCount = useMemo(() => allStores.filter((store) => getAverageRating(store) >= 4).length, [allStores]);
   const nearbyCount = useMemo(() => {
@@ -551,6 +632,7 @@ export default function Home() {
   const clearFilters = () => {
     setSearchQuery('');
     setActiveFeed('all');
+    setSelectedViewCount('all');
     setSelectedCategory('all');
     setSelectedState('all');
     setSelectedArea('all');
@@ -560,13 +642,47 @@ export default function Home() {
   const hasAnyFilters =
     searchQuery.trim().length > 0 ||
     activeFeed !== 'all' ||
+    selectedViewCount !== 'all' ||
     selectedCategory !== 'all' ||
     selectedState !== 'all' ||
     selectedArea !== 'all';
+  const locationReady = Boolean(userLocation);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.15),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(244,114,182,0.12),_transparent_28%),linear-gradient(180deg,_#fffdf7_0%,_#ffffff_38%,_#fff7ed_100%)] text-slate-900">
       <Header />
+
+      {!locationReady && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[2rem] border border-white/80 bg-white p-6 text-center shadow-[0_28px_80px_rgba(15,23,42,0.28)] sm:p-8">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+              <i className="pi pi-map-marker text-2xl" />
+            </div>
+            <h2 className="mt-4 text-3xl font-black text-slate-950">Location is required</h2>
+            <p className="mt-3 text-sm leading-7 text-slate-600">
+              Please allow location access to continue. The store list, filters, and nearby sorting will unlock after permission is granted.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Button
+                label={locationLoading ? 'Requesting...' : 'Allow location'}
+                icon="pi pi-map-marker"
+                onClick={requestLocation}
+                disabled={locationLoading}
+                className="border-none bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-3 text-sm font-semibold text-white"
+              />
+              {locationError && (
+                <Button
+                  label="Try again"
+                  icon="pi pi-refresh"
+                  onClick={requestLocation}
+                  className="border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
+                />
+              )}
+            </div>
+            {locationError && <p className="mt-4 text-sm font-medium text-rose-600">{locationError}</p>}
+          </div>
+        </div>
+      )}
 
       <section className="relative overflow-hidden px-4 pb-12 pt-10 sm:px-6 sm:pb-16 sm:pt-16 lg:px-8 lg:pb-20 lg:pt-20">
         <div className="absolute inset-0 -z-10 opacity-80">
@@ -588,7 +704,7 @@ export default function Home() {
               </h1>
               <p className="max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
                 Browse every public store with fast filtering for promotion, newest openings, popularity, top ratings,
-                location, store type, sponsored placements, area-wise discovery, and GST verification.
+                location, store type, featured stores, area-wise discovery, and GST verification.
               </p>
             </div>
 
@@ -618,7 +734,7 @@ export default function Home() {
               {[
                 { label: 'Stores', value: allStores.length, tone: 'from-amber-500 to-orange-500' },
                 { label: 'Featured', value: featuredCount, tone: 'from-emerald-500 to-teal-500' },
-                { label: 'Sponsored', value: sponsoredCount, tone: 'from-rose-500 to-orange-500' },
+                { label: 'Verified', value: verifiedCount, tone: 'from-rose-500 to-orange-500' },
                 { label: 'GST verified', value: gstCount, tone: 'from-sky-500 to-cyan-500' },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-[1.5rem] border border-white/70 bg-white/90 p-4 shadow-lg backdrop-blur-sm">
@@ -651,7 +767,7 @@ export default function Home() {
                   <p className="mt-2 text-sm leading-6 text-white/85">
                     {userLocation
                       ? 'Nearby sort is based on your browser location and store coordinates.'
-                      : 'Click Use my location to rank stores around you.'}
+                      : 'Click Use my location to sort stores around you.'}
                   </p>
                 </div>
               </div>
@@ -672,155 +788,190 @@ export default function Home() {
       </section>
 
       <section id="store-browser" className="px-4 pb-12 sm:px-6 lg:px-8 lg:pb-16">
-        <div className="mx-auto max-w-7xl rounded-[2rem] border border-white/70 bg-white/85 p-4 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-6 lg:p-8">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-3xl space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-amber-700">
-                Filter system
+        <div className="mx-auto max-w-7xl space-y-6">
+          <div className="rounded-[2rem] border border-white/70 bg-white/90 p-4 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-amber-700">
+                  Store filters
+                </div>
+                <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Choose what you want to browse</h2>
+                <p className="text-sm leading-6 text-slate-600">
+                  Keep the filter bar on top and change it any time while scrolling the store list.
+                </p>
               </div>
-              <h2 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-                Store list with promotion, popularity, rating, location, and category controls.
-              </h2>
-              <p className="text-sm leading-7 text-slate-600 sm:text-base">
-                Search by store name, area, state, category, or owner. Then switch the feed to spotlight featured stores,
-                newest openings, popular stores, top-rated stores, nearby stores, sponsored placements, GST verified stores,
-                or random exploration.
-              </p>
+
+              <button
+                type="button"
+                onClick={() => setIsFiltersOpen((current) => !current)}
+                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm lg:hidden"
+              >
+                <i className={`pi ${isFiltersOpen ? 'pi-chevron-up' : 'pi-sliders-h'} mr-2`} />
+                {isFiltersOpen ? 'Hide filters' : 'Show filters'}
+              </button>
             </div>
 
-            <div className="min-w-[18rem] rounded-[1.5rem] border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-              Showing <span className="text-slate-950">{visibleStores.length}</span> stores in the {activeFeedLabel.toLowerCase()} view.
-            </div>
-          </div>
-
-          <div className="mt-6 space-y-5 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 sm:p-5">
-            <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-              <div>
+            <div className={`${isFiltersOpen ? 'mt-5 block' : 'mt-5 hidden'} space-y-4 lg:block`}>
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_auto_auto]">
                 <IconField iconPosition="left">
                   <InputIcon className="pi pi-search text-slate-400" />
                   <InputText
                     type="text"
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search by store name, area, state, type, or owner"
+                    placeholder="Search stores"
                     className="w-full rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
                   />
                 </IconField>
-              </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="sr-only">View count filter</span>
+                  <select
+                    value={selectedViewCount}
+                    onChange={(event) => setSelectedViewCount(event.target.value as ViewCountFilter)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
+                  >
+                    {viewCountFilters.map((filter) => (
+                      <option key={filter.key} value={filter.key} title={filter.description}>
+                        {filter.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
                 <button
                   type="button"
                   onClick={requestLocation}
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-amber-200 hover:text-amber-700"
                 >
                   <i className="pi pi-map-marker" />
-                  {locationLoading ? 'Locating...' : userLocation ? 'Update location' : 'Enable nearby search'}
+                  {locationLoading ? 'Locating...' : userLocation ? 'Update location' : 'Use location'}
                 </button>
+
                 <button
                   type="button"
                   onClick={clearFilters}
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
                 >
                   <i className="pi pi-filter-slash" />
-                  Clear filters
+                  Clear
                 </button>
               </div>
-            </div>
 
-            <div className="overflow-x-auto pb-1">
-              <div className="flex min-w-max gap-3">
-                {feedModes.map((feedMode) => {
-                  const active = activeFeed === feedMode.key;
+              <div className="overflow-x-auto pb-1">
+                <div className="flex min-w-max gap-3">
+                  {feedModes.map((feedMode) => {
+                    const active = activeFeed === feedMode.key;
 
-                  return (
-                    <button
-                      key={feedMode.key}
-                      type="button"
-                      onClick={() => setActiveFeed(feedMode.key)}
-                      className={`group flex min-w-[12rem] flex-col gap-1 rounded-[1.4rem] border px-4 py-3 text-left transition ${
-                        active
-                          ? 'border-amber-400 bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-amber-200 hover:shadow-md'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2 text-sm font-bold">
-                        <i className={`pi ${feedMode.icon} ${active ? 'text-white' : 'text-amber-500'}`} />
-                        {feedMode.label}
-                      </span>
-                      <span className={`text-xs font-medium ${active ? 'text-white/80' : 'text-slate-500'}`}>
-                        {feedMode.description}
-                      </span>
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={feedMode.key}
+                        type="button"
+                        onClick={() => setActiveFeed(feedMode.key)}
+                        className={`group flex min-w-[11rem] flex-col gap-1 rounded-[1.2rem] border px-4 py-3 text-left transition ${active
+                            ? 'border-amber-400 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-amber-200 hover:shadow-md'
+                          }`}
+                      >
+                        <span className="flex items-center gap-2 text-sm font-bold">
+                          <i className={`pi ${feedMode.icon} ${active ? 'text-white' : 'text-amber-500'}`} />
+                          {feedMode.label}
+                        </span>
+                        <span className={`text-[11px] font-medium ${active ? 'text-white/80' : 'text-slate-500'}`}>
+                          {feedMode.description}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
-              <label className="space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Store Type / Category</span>
-                <select
-                  value={selectedCategory}
-                  onChange={(event) => setSelectedCategory(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
-                >
-                  <option value="all">All categories</option>
-                  {uniqueCategories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="grid gap-3 lg:grid-cols-3">
+                <label className="space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Category</span>
+                  <select
+                    value={selectedCategory}
+                    onChange={(event) => setSelectedCategory(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
+                  >
+                    <option value="all">All categories</option>
+                    {uniqueCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">State</span>
-                <select
-                  value={selectedState}
-                  onChange={(event) => setSelectedState(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
-                >
-                  <option value="all">All states</option>
-                  {uniqueStates.map((state) => (
-                    <option key={state} value={state}>
-                      {state}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">State</span>
+                  <select
+                    value={selectedState}
+                    onChange={(event) => setSelectedState(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
+                  >
+                    <option value="all">All states</option>
+                    {uniqueStates.map((state) => (
+                      <option key={state} value={state}>
+                        {state}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Area</span>
-                <select
-                  value={selectedArea}
-                  onChange={(event) => setSelectedArea(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
-                >
-                  <option value="all">All areas</option>
-                  {uniqueAreas.map((area) => (
-                    <option key={area} value={area}>
-                      {area}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            {hasAnyFilters && (
-              <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
-                {searchQuery.trim() && <span className="rounded-full bg-white px-3 py-1 shadow-sm">Search: {searchQuery.trim()}</span>}
-                {activeFeed !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">Feed: {activeFeedLabel}</span>}
-                {selectedCategory !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">Category: {selectedCategory}</span>}
-                {selectedState !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">State: {selectedState}</span>}
-                {selectedArea !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">Area: {selectedArea}</span>}
+                <label className="space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Area</span>
+                  <select
+                    value={selectedArea}
+                    onChange={(event) => setSelectedArea(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
+                  >
+                    <option value="all">All areas</option>
+                    {uniqueAreas.map((area) => (
+                      <option key={area} value={area}>
+                        {area}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
-            )}
+
+              {hasAnyFilters && (
+                <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+                  {searchQuery.trim() && <span className="rounded-full bg-white px-3 py-1 shadow-sm">Search</span>}
+                  {activeFeed !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">{activeFeedLabel}</span>}
+                  {selectedViewCount !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">{selectedViewCount}+ views</span>}
+                  {selectedCategory !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">{selectedCategory}</span>}
+                  {selectedState !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">{selectedState}</span>}
+                  {selectedArea !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">{selectedArea}</span>}
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="mt-8">
+          <div className="flex flex-col gap-3 rounded-[2rem] border border-white/70 bg-white/85 p-4 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:flex-row sm:items-end sm:justify-between sm:p-6">
+            <div className="max-w-3xl space-y-2">
+              <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-amber-700">
+                Store results
+              </div>
+              <h2 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                Results update instantly as you change the top filters.
+              </h2>
+              <p className="text-sm leading-7 text-slate-600 sm:text-base">
+                {activeFeed !== 'all' || selectedViewCount !== 'all' || selectedCategory !== 'all' || selectedState !== 'all' || selectedArea !== 'all' || searchQuery.trim()
+                  ? 'Use the sticky filter bar above to refine the list.'
+                  : 'Browse featured, nearby, verified, and trending stores from here.'}
+              </p>
+            </div>
+
+            <div className="min-w-[16rem] rounded-[1.5rem] border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+              Showing <span className="text-slate-950">{visibleStores.length}</span> stores
+            </div>
+          </div>
+
+          <div>
             {loading ? (
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, index) => (
                   <div key={index} className="overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm">
                     <div className="h-52 animate-pulse bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100" />
@@ -853,7 +1004,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-2xl font-black text-slate-950">No stores match this filter</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Try another category, clear the state or area filter, or switch to the all stores view.
+                  Try another category, clear the filters in the top bar, or switch to the all stores view.
                 </p>
                 <Button
                   label="Reset filters"
@@ -863,7 +1014,7 @@ export default function Home() {
                 />
               </div>
             ) : (
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 {visibleStores.map((store) => (
                   <StoreCard key={store._id} store={store} userLocation={userLocation} />
                 ))}
@@ -880,9 +1031,9 @@ export default function Home() {
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-600">Why this works</p>
               <h3 className="mt-2 text-3xl font-black text-slate-950">Every store stays visible, but the most relevant ones rise first.</h3>
               <p className="mt-3 text-sm leading-7 text-slate-600">
-                Featured and sponsored stores are highlighted, newest stores are easy to find, popular and top-rated stores
-                are ranked by engagement and feedback, nearby stores can use your location, and state / area filtering keeps
-                the list practical for browsing.
+                Featured stores are highlighted, newest stores are easy to find, popular and top-rated stores are ordered by
+                engagement and feedback, nearby stores can use your location, and state / area filtering keeps the list
+                practical for browsing.
               </p>
             </div>
 

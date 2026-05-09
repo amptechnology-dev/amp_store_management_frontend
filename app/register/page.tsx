@@ -22,6 +22,10 @@ export default function RegisterPage() {
 	const router = useRouter();
 	const [showPassword, setShowPassword] = useState(false);
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+	const [registeredEmail, setRegisteredEmail] = useState("");
+	const [otp, setOtp] = useState("");
+	const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
 	const {
 		register,
@@ -43,23 +47,55 @@ export default function RegisterPage() {
 		setIsSubmitting(true);
 
 		try {
+			const normalizedEmail = values.email.trim();
 			const payload = {
 				name: values.name.trim(),
-				email: values.email.trim(),
+				email: normalizedEmail,
 				phone: values.phone.trim(),
 				password: values.password,
 			};
 
 			const response = await axiosInstance.post("/api/register/register-owner", payload);
 			toast.success(response.data?.message || "Registration successful");
+			setRegisteredEmail(normalizedEmail);
+			setOtp("");
+			setIsOtpModalOpen(true);
 			reset();
-			setTimeout(() => {
-				router.push("/login");
-			}, 900);
 		} catch (error: any) {
 			toast.error(error?.response?.data?.message || "Registration failed. Please try again.");
 		} finally {
 			setIsSubmitting(false);
+		}
+	};
+
+	const handleVerifyOtp = async () => {
+		if (!registeredEmail.trim()) {
+			toast.error("Registered email is missing. Please register again.");
+			return;
+		}
+
+		if (!otp.trim()) {
+			toast.error("Please enter the OTP sent to your email.");
+			return;
+		}
+
+		setIsVerifyingOtp(true);
+
+		try {
+			const response = await axiosInstance.post("/api/register/verify-email-otp", {
+				email: registeredEmail.trim(),
+				otp: otp.trim(),
+			});
+
+			toast.success(response.data?.message || "Email verified successfully");
+			setIsOtpModalOpen(false);
+			setRegisteredEmail("");
+			setOtp("");
+			router.push("/login");
+		} catch (error: any) {
+			toast.error(error?.response?.data?.message || "OTP verification failed. Please try again.");
+		} finally {
+			setIsVerifyingOtp(false);
 		}
 	};
 
@@ -206,6 +242,9 @@ export default function RegisterPage() {
 								<div style={{ display: "grid", gap: 8 }}>
 									<label htmlFor="name" style={{ fontWeight: 700, color: "#4f3f16" }}>
 										Name
+										<span aria-hidden="true" style={{ color: "#ef4444", marginLeft: 4 }}>
+											*
+										</span>
 									</label>
 									<input
 										id="name"
@@ -228,6 +267,9 @@ export default function RegisterPage() {
 								<div style={{ display: "grid", gap: 8 }}>
 									<label htmlFor="email" style={{ fontWeight: 700, color: "#4f3f16" }}>
 										Email
+										<span aria-hidden="true" style={{ color: "#ef4444", marginLeft: 4 }}>
+											*
+										</span>
 									</label>
 									<input
 										id="email"
@@ -251,6 +293,9 @@ export default function RegisterPage() {
 								<div style={{ display: "grid", gap: 8 }}>
 									<label htmlFor="phone" style={{ fontWeight: 700, color: "#4f3f16" }}>
 										Phone
+										<span aria-hidden="true" style={{ color: "#ef4444", marginLeft: 4 }}>
+											*
+										</span>
 									</label>
 									<input
 										id="phone"
@@ -274,6 +319,9 @@ export default function RegisterPage() {
 								<div style={{ display: "grid", gap: 8 }}>
 									<label htmlFor="password" style={{ fontWeight: 700, color: "#4f3f16" }}>
 										Password
+										<span aria-hidden="true" style={{ color: "#ef4444", marginLeft: 4 }}>
+											*
+										</span>
 									</label>
 									<Controller
 										name="password"
@@ -342,6 +390,149 @@ export default function RegisterPage() {
 					</div>
 				</div>
 			</section>
+
+			{isOtpModalOpen && (
+				<div
+					role="dialog"
+					aria-modal="true"
+					aria-labelledby="otp-modal-title"
+					style={{
+						position: "fixed",
+						inset: 0,
+						zIndex: 60,
+						display: "grid",
+						placeItems: "center",
+						padding: 16,
+						background: "rgba(15, 23, 42, 0.55)",
+						backdropFilter: "blur(8px)",
+					}}
+					onClick={() => {
+						if (!isVerifyingOtp) {
+							setIsOtpModalOpen(false);
+						}
+					}}
+				>
+					<div
+						style={{
+							width: "100%",
+							maxWidth: 520,
+							borderRadius: 24,
+							overflow: "hidden",
+							background: "linear-gradient(180deg, #ffffff 0%, #fffdf5 100%)",
+							border: "1px solid rgba(224, 172, 31, 0.24)",
+							boxShadow: "0 28px 80px rgba(15,23,42,0.28)",
+						}}
+						onClick={(event) => event.stopPropagation()}
+					>
+						<div style={{ padding: 20, borderBottom: "1px solid rgba(224, 172, 31, 0.14)" }}>
+							<p style={{ margin: 0, color: "#a06f00", fontSize: 12, fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase" }}>
+								Email verification
+							</p>
+							<h3 id="otp-modal-title" style={{ margin: "8px 0 0", color: "#221b0f", fontSize: 24, fontWeight: 900 }}>
+								Verify your email with OTP
+							</h3>
+							<p style={{ margin: "8px 0 0", color: "#6f5c2c", fontSize: 14, lineHeight: 1.7 }}>
+								Enter the OTP sent to your email address to complete registration.
+							</p>
+						</div>
+
+						<div style={{ padding: 20, display: "grid", gap: 16 }}>
+							<div style={{ display: "grid", gap: 8 }}>
+								<label htmlFor="verifiedEmail" style={{ fontWeight: 700, color: "#4f3f16" }}>
+									Email
+									<span aria-hidden="true" style={{ color: "#ef4444", marginLeft: 4 }}>
+										*
+									</span>
+								</label>
+								<input
+									id="verifiedEmail"
+									type="email"
+									value={registeredEmail}
+									readOnly
+									style={{
+										width: "100%",
+										height: 46,
+										borderRadius: 12,
+										border: "1px solid #e8d89f",
+										background: "#f8f4e8",
+										padding: "0 14px",
+										outline: "none",
+										color: "#6b5b2c",
+									}}
+								/>
+							</div>
+
+							<div style={{ display: "grid", gap: 8 }}>
+								<label htmlFor="otp" style={{ fontWeight: 700, color: "#4f3f16" }}>
+									OTP
+									<span aria-hidden="true" style={{ color: "#ef4444", marginLeft: 4 }}>
+										*
+									</span>
+								</label>
+								<input
+									id="otp"
+									type="text"
+									inputMode="numeric"
+									placeholder="Enter OTP"
+									value={otp}
+									onChange={(event) => setOtp(event.target.value)}
+									style={{
+										width: "100%",
+										height: 46,
+										borderRadius: 12,
+										border: "1px solid #e8d89f",
+										background: "#fffef9",
+										padding: "0 14px",
+										outline: "none",
+									}}
+								/>
+							</div>
+
+							<div style={{ display: "flex", gap: 12, justifyContent: "flex-end", flexWrap: "wrap" }}>
+								<button
+									type="button"
+									disabled={isVerifyingOtp}
+									onClick={() => {
+										if (!isVerifyingOtp) {
+											setIsOtpModalOpen(false);
+											setOtp("");
+										}
+									}}
+									style={{
+										height: 46,
+										padding: "0 18px",
+										borderRadius: 12,
+										border: "1px solid #e0ac1f",
+										background: "#fffef9",
+										color: "#8a6711",
+										fontWeight: 800,
+										cursor: isVerifyingOtp ? "not-allowed" : "pointer",
+									}}
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									disabled={isVerifyingOtp}
+									onClick={handleVerifyOtp}
+									style={{
+										height: 46,
+										padding: "0 18px",
+										borderRadius: 12,
+										border: "1px solid #e0ac1f",
+										background: isVerifyingOtp ? "linear-gradient(120deg,#f1d47e,#edcc6b)" : "linear-gradient(120deg,#f3be27,#e4a90e)",
+										color: "#3b2f0f",
+										fontWeight: 800,
+										cursor: isVerifyingOtp ? "not-allowed" : "pointer",
+									}}
+								>
+									{isVerifyingOtp ? "Verifying..." : "Verify OTP"}
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 
 			<ToastContainer position="top-right" />
 		</main>

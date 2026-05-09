@@ -15,6 +15,7 @@ import { InputTextarea } from "primereact/inputtextarea";
 import { Checkbox } from "primereact/checkbox";
 import Image from "next/image";
 import { useProfileStore } from "@/lib/store/profileStore";
+import storeTypeList from "@/lib/storetype.json";
 
 // Zod Schemas
 const timingByDaySchema = z.object({
@@ -131,20 +132,75 @@ const DAYS = [
   "sunday",
 ] as const;
 
-const STORE_TYPES = [
-  { label: "Grocery", value: "Grocery", icon: "pi pi-shopping-basket" },
-  { label: "Electronics", value: "Electronics", icon: "pi pi-mobile" },
-  { label: "Clothing", value: "Clothing", icon: "pi pi-tag" },
-  { label: "Pharmacy", value: "Pharmacy", icon: "pi pi-heart" },
-  { label: "Books", value: "Books", icon: "pi pi-book" },
-  { label: "Furniture", value: "Furniture", icon: "pi pi-table" },
-  { label: "Other", value: "Other", icon: "pi pi-ellipsis-h" },
-] as const;
-
 type StoreTypeOption = {
   label: string;
   value: string;
   icon: string;
+};
+
+type LocationSearchResult = {
+  display_name: string;
+  lat: string;
+  lon: string;
+  address?: Record<string, string | undefined>;
+};
+
+const getStoreTypeIcon = (label: string) => {
+  const normalized = label.toLowerCase();
+
+  if (/grocery/.test(normalized)) {
+    return "pi pi-shopping-cart";
+  }
+
+  if (/supermarket/.test(normalized)) {
+    return "pi pi-shop";
+  }
+
+  if (/convenience/.test(normalized)) {
+    return "pi pi-shopping-bag";
+  }
+
+  if (/clothing|boutique|fashion|footwear|accessor|jewell|cosmetic|beauty|optical|supplement|tailor/.test(normalized)) {
+    return "pi pi-shopping-bag";
+  }
+
+  if (/electronics|appliance|it services|software|digital marketing|design studio|mobile/.test(normalized)) {
+    return "pi pi-desktop";
+  }
+
+  if (/furniture|home decor|interior|real estate|property|construction|building materials|hardware|paint|tiles|plumbing|cement|steel/.test(normalized)) {
+    return "pi pi-home";
+  }
+
+  if (/restaurant|café|cafe|bakery|sweet|ice cream|fast food|food truck|cloud kitchen|catering|juice|meat|fruits|vegetables|bar|hotel|resort/.test(normalized)) {
+    return "pi pi-star";
+  }
+
+  if (/car|vehicle|tyre|battery|garage|wash|transport|courier|logistics|delivery|warehouse/.test(normalized)) {
+    return "pi pi-truck";
+  }
+
+  if (/medical|clinic|dental|lab|hospital|physio|gym|spa|optician|health|pharmacy/.test(normalized)) {
+    return "pi pi-heart";
+  }
+
+  if (/accounting|legal|marketing|consultancy|agency|business|insurance|bank|finance|crypto|microfinance|stock|mutual fund|recruitment|hr|event management/.test(normalized)) {
+    return "pi pi-briefcase";
+  }
+
+  if (/school|college|coaching|training|academy|language|daycare|edtech|music|film|photography|gaming|publishing/.test(normalized)) {
+    return "pi pi-book";
+  }
+
+  if (/cleaning|pest control|painting|renovation|repair|gardening|laundry|security|import export|factory|manufacturing/.test(normalized)) {
+    return "pi pi-cog";
+  }
+
+  if (/pet|astrology|religious|ngo|charity/.test(normalized)) {
+    return "pi pi-star";
+  }
+
+  return "pi pi-tag";
 };
 
 const INDIAN_STATES = [
@@ -326,6 +382,10 @@ function StoreForm({
   const [isActive, setIsActive] = useState(true);
   const [isVerify, setIsVerify] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(false);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [locationResults, setLocationResults] = useState<LocationSearchResult[]>([]);
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
+  const [selectedLocationLabel, setSelectedLocationLabel] = useState("");
   const canShowVerifyField = profile?.role === "ADMIN";
 
   const isEditMode = !!storeId;
@@ -380,7 +440,15 @@ function StoreForm({
   const selectedState = watch("state");
   const selectedCountry = watch("country") || "India";
   const mapCenter = STATE_CENTERS[selectedState] || [INDIA_CENTER.latitude, INDIA_CENTER.longitude];
-  const storeTypeOptions: StoreTypeOption[] = STORE_TYPES.map((option) => ({ ...option }));
+  const storeTypeOptions: StoreTypeOption[] = storeTypeList.map((option) => ({
+    label: option.label,
+    value: option.label,
+    icon: getStoreTypeIcon(option.label),
+  }));
+
+  useEffect(() => {
+    setLocationResults([]);
+  }, [selectedState, selectedCountry]);
 
   const renderStoreTypeOption = (option: StoreTypeOption) => (
     <div className="flex items-center gap-2">
@@ -402,6 +470,77 @@ function StoreForm({
     );
   };
 
+  const formatDetailedLocation = (address: Record<string, string | undefined>, fallback: string) => {
+    const street = [address.house_number, address.road].filter(Boolean).join(" ");
+    const locality = [
+      address.suburb,
+      address.neighbourhood,
+      address.city_district,
+      address.city,
+      address.town,
+      address.village,
+      address.municipality,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    return [street, locality, address.state, address.country].filter(Boolean).join(", ") || fallback;
+  };
+
+  const applyLocationResult = (result: LocationSearchResult) => {
+    const latitude = Number(result.lat);
+    const longitude = Number(result.lon);
+    const address = result.address || {};
+    const detailedLocation = formatDetailedLocation(address, result.display_name);
+
+    setValue("lat", latitude, { shouldDirty: true, shouldValidate: true });
+    setValue("long", longitude, { shouldDirty: true, shouldValidate: true });
+    setValue("area", detailedLocation, { shouldDirty: true, shouldValidate: true });
+    setValue("state", address.state || selectedState, { shouldDirty: true, shouldValidate: true });
+    setValue("country", address.country || selectedCountry || "India", { shouldDirty: true, shouldValidate: true });
+
+    setLocationQuery(detailedLocation);
+    setSelectedLocationLabel(detailedLocation);
+    setLocationResults([]);
+  };
+
+  const searchDetailedLocation = async () => {
+    const query = locationQuery.trim();
+
+    if (!query) {
+      toast.error("Enter a street, landmark, or locality to search.");
+      return;
+    }
+
+    const searchText = [query, selectedState, selectedCountry].filter(Boolean).join(", ");
+
+    setIsSearchingLocation(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&q=${encodeURIComponent(searchText)}`,
+        { headers: { Accept: "application/json" } }
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to search for detailed locations");
+      }
+
+      const results = (await response.json()) as LocationSearchResult[];
+
+      if (!Array.isArray(results) || results.length === 0) {
+        setLocationResults([]);
+        toast.info("No detailed locations found. Try a nearby landmark or street name.");
+        return;
+      }
+
+      setLocationResults(results);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to search detailed locations");
+    } finally {
+      setIsSearchingLocation(false);
+    }
+  };
+
   const setLocationFromMap = async (latitude: number, longitude: number) => {
     setValue("lat", latitude, { shouldDirty: true, shouldValidate: true });
     setValue("long", longitude, { shouldDirty: true, shouldValidate: true });
@@ -419,28 +558,18 @@ function StoreForm({
 
       const result = await response.json();
       const address = (result?.address || {}) as Record<string, string | undefined>;
-
-      const areaName =
-        address.suburb ||
-        address.city_district ||
-        address.city ||
-        address.town ||
-        address.village ||
-        address.municipality ||
-        address.county ||
-        address.state_district ||
-        result?.display_name?.split(",")[0] ||
-        selectedArea ||
-        "";
+      const detailedLocation = formatDetailedLocation(address, result?.display_name || selectedArea || "");
 
       const stateName = address.state || address.region || address.state_district || selectedState || "";
       const countryName = address.country || selectedCountry || "India";
 
-      setValue("area", areaName, { shouldDirty: true, shouldValidate: true });
+      setValue("area", detailedLocation, { shouldDirty: true, shouldValidate: true });
       if (stateName) {
         setValue("state", stateName, { shouldDirty: true, shouldValidate: true });
       }
       setValue("country", countryName, { shouldDirty: true, shouldValidate: true });
+      setLocationQuery(detailedLocation);
+      setSelectedLocationLabel(detailedLocation);
     } catch (error: any) {
       toast.error(error?.message || "Failed to resolve location from map");
     } finally {
@@ -473,6 +602,8 @@ function StoreForm({
       setValue("state", store.address?.state?.trim() || "");
       setValue("country", store.address?.country?.trim() || "");
       setValue("seoDescription", store.imageSeo?.description || "");
+      setLocationQuery(store.address?.area?.trim() || "");
+      setSelectedLocationLabel(store.address?.area?.trim() || "");
 
       const openValue = formatTimeInputValue(store.timing?.open);
       const closeValue = formatTimeInputValue(store.timing?.close);
@@ -673,6 +804,9 @@ function StoreForm({
       setImagePreviews([]);
       setExistingImages([]);
       setKeywords([]);
+      setLocationQuery("");
+      setLocationResults([]);
+      setSelectedLocationLabel("");
       onSuccess();
     } catch (error: any) {
       console.error("Store operation error:", error);
@@ -903,22 +1037,97 @@ function StoreForm({
               {errors.state && <small className="text-red-500">{errors.state.message}</small>}
             </div>
 
-            <div className="space-y-1 md:col-span-2">
-              <label className="text-sm font-semibold text-gray-700">Area</label>
-              <InputText
-                {...register("area")}
-                placeholder="Enter area"
-                className={`w-full p-2 border rounded-lg ${errors.area ? "border-red-500" : "border-yellow-300"}`}
+            <div className="space-y-2 md:col-span-2">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                    Detailed Location <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Search by street, house number, landmark, or locality. The selected state narrows the results.
+                  </p>
+                </div>
+                <div className="text-xs text-gray-500 text-right">
+                  <div>Selected state: {selectedState || "Not selected"}</div>
+                  <div>Country: {selectedCountry || "India"}</div>
+                </div>
+              </div>
+
+              <Controller
+                name="area"
+                control={control}
+                render={({ field }) => (
+                  <div className="space-y-3">
+                    <div className="flex flex-col md:flex-row gap-2">
+                      <InputText
+                        value={locationQuery || field.value || ""}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setLocationQuery(value);
+                          setSelectedLocationLabel(value);
+                          field.onChange(value);
+                          setLocationResults([]);
+                        }}
+                        placeholder="15 Sridhar Chakrabory Street, Uttarpara"
+                        className={`w-full p-2 border rounded-lg ${errors.area ? "border-red-500" : "border-yellow-300"}`}
+                      />
+                      <Button
+                        type="button"
+                        label={isSearchingLocation ? "Searching..." : "Search"}
+                        icon={isSearchingLocation ? "pi pi-spin pi-spinner" : "pi pi-search"}
+                        onClick={searchDetailedLocation}
+                        className="!bg-yellow-400 !text-gray-900 !border-yellow-500 md:!w-40"
+                        disabled={isSearchingLocation}
+                      />
+                    </div>
+
+                    {locationResults.length > 0 && (
+                      <div className="rounded-2xl border border-yellow-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.08)] overflow-hidden">
+                        <div className="px-4 py-3 border-b border-yellow-100 bg-yellow-50/70">
+                          <p className="text-sm font-semibold text-gray-800 m-0">Select the exact place</p>
+                          <p className="text-xs text-gray-500 mt-1 m-0">Pick the matching street-level result to place the map pin precisely.</p>
+                        </div>
+                        <div className="max-h-56 overflow-auto divide-y divide-yellow-100">
+                          {locationResults.map((result, index) => {
+                            const itemLabel = formatDetailedLocation(result.address || {}, result.display_name);
+
+                            return (
+                              <button
+                                key={`${result.display_name}-${index}`}
+                                type="button"
+                                onClick={() => applyLocationResult(result)}
+                                className="w-full text-left px-4 py-3 hover:bg-yellow-50 transition"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-yellow-100 text-yellow-700">
+                                    <i className="pi pi-map-marker" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-sm font-semibold text-gray-800 leading-6 truncate">{itemLabel}</div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      Lat {Number(result.lat).toFixed(6)} | Long {Number(result.lon).toFixed(6)}
+                                    </div>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {errors.area && <small className="text-red-500">{errors.area.message}</small>}
+                  </div>
+                )}
               />
-              {errors.area && <small className="text-red-500">{errors.area.message}</small>}
             </div>
 
             <div className="space-y-2 md:col-span-2">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Select area on map</label>
+                  <label className="text-sm font-semibold text-gray-700">Refine on map</label>
                   <p className="text-xs text-gray-500 mt-1">
-                    Click the map or drag the marker to fill area, latitude, and longitude automatically.
+                    Click the map or drag the marker after choosing a detailed location.
                   </p>
                 </div>
                 <div className="text-xs text-gray-500 text-right">
@@ -935,7 +1144,7 @@ function StoreForm({
                 }}
               >
                 {isMapLoading ? (
-                  <div className="h-[320px] flex items-center justify-center bg-gradient-to-br from-yellow-50 to-white text-gray-600">
+                  <div className="h-[420px] flex items-center justify-center bg-gradient-to-br from-yellow-50 to-white text-gray-600">
                     Resolving location...
                   </div>
                 ) : (
@@ -943,6 +1152,7 @@ function StoreForm({
                     latitude={Number(selectedLat || INDIA_CENTER.latitude)}
                     longitude={Number(selectedLong || INDIA_CENTER.longitude)}
                     center={mapCenter}
+                    selectedLocation={selectedLocationLabel || locationQuery || selectedArea || undefined}
                     onPick={(latitude, longitude) => {
                       void setLocationFromMap(latitude, longitude);
                     }}
