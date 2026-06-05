@@ -8,7 +8,7 @@ import { InputText } from 'primereact/inputtext';
 import { IconField } from 'primereact/iconfield';
 import { InputIcon } from 'primereact/inputicon';
 import axiosInstance from '@/service/axios.service';
-
+import VortexLoader from '@/app/(web)/components/VortexLoader';
 const Header = dynamic(() => import('../components/Header'), { ssr: false });
 const Footer = dynamic(() => import('../components/Footer'), { ssr: false });
 
@@ -305,10 +305,14 @@ function StoreCard({ store, userLocation }: { store: Store; userLocation: Locati
   const distance = userLocation ? getDistanceKm(userLocation, store) : null;
   const openNow = store.isActive && isStoreOpenNow(store.timing?.open || '', store.timing?.close || '');
   const ownerName = store.userId?.name || 'Owner not set';
+  const storeTypeLabel = store.storeType?.trim();
+  const locationLabel = [store.address?.area?.trim(), store.address?.state?.trim(), store.address?.country?.trim()]
+    .filter(Boolean)
+    .join(', ');
 
   return (
-    <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-[2rem] border border-white/80 bg-white/95 shadow-[0_18px_44px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_rgba(15,23,42,0.14)]">
-      <div className="relative h-52 overflow-hidden bg-slate-100 sm:h-56">
+    <article className="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-3xl border border-slate-200/70 bg-white/90 shadow-[0_16px_50px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-1 hover:border-amber-200/80 hover:shadow-[0_26px_80px_rgba(15,23,42,0.14)] focus-within:ring-2 focus-within:ring-amber-400/60">
+      <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
         {store.images?.length > 0 ? (
           <img
             src={store.images[0]}
@@ -353,21 +357,35 @@ function StoreCard({ store, userLocation }: { store: Store; userLocation: Locati
 
       <div className="flex flex-1 flex-col gap-4 p-5 sm:p-6">
         <div className="space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <h4 className="text-[1.08rem] font-extrabold leading-snug text-slate-950 sm:text-[1.18rem]">{store.storeName}</h4>
+              {storeTypeLabel && (
+                <div className="mb-2 inline-flex items-center gap-2">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-700">
+                    {storeTypeLabel}
+                  </span>
+                </div>
+              )}
+              <h4 className="text-[1.12rem] font-black leading-snug text-slate-950 sm:text-[1.22rem]">{store.storeName}</h4>
               <p className="mt-2 text-sm font-medium text-slate-700">
                 Owner: <span className="font-semibold text-slate-950">{ownerName}</span>
               </p>
             </div>
+
             <div
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${openNow ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+              className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${openNow ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
                 }`}
             >
               <span className={`h-2 w-2 rounded-full ${openNow ? 'bg-emerald-500' : 'bg-rose-500'}`} />
               {openNow ? 'Open now' : 'Closed'}
             </div>
           </div>
+
+          {store.description?.trim() && (
+            <p className="text-sm leading-6 text-slate-600 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
+              {store.description.trim()}
+            </p>
+          )}
 
           <div className="flex flex-wrap gap-2">
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -378,18 +396,17 @@ function StoreCard({ store, userLocation }: { store: Store; userLocation: Locati
               <i className="pi pi-eye" />
               {viewCount} {viewCount === 1 ? 'view' : 'views'}
             </span>
-            {hasGst(store) && <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">GST</span>}
           </div>
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <p className="min-w-0 text-xs font-medium text-slate-500">
-            {store.address?.state || 'State not set'}{store.address?.country ? `, ${store.address.country}` : ''}
+          <p className="min-w-0 text-xs font-medium text-slate-500 truncate" title={locationLabel || undefined}>
+            {locationLabel || 'Location not set'}
           </p>
 
           <Link href={`/store/${store._id}`} className="shrink-0">
             <Button
-              label="View Details"
+              label="View details"
               icon="pi pi-arrow-right"
               iconPos="right"
               rounded
@@ -403,6 +420,8 @@ function StoreCard({ store, userLocation }: { store: Store; userLocation: Locati
 }
 
 export default function Home() {
+  const INITIAL_PAGE_SIZE = 9;
+  const LOAD_MORE_STEP = 9;
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFeed, setActiveFeed] = useState<FeedMode>('all');
   const [selectedViewCount, setSelectedViewCount] = useState<ViewCountFilter>('all');
@@ -416,6 +435,8 @@ export default function Home() {
   const [userLocation, setUserLocation] = useState<LocationPoint | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+  
 
   useEffect(() => {
     const fetchStores = async () => {
@@ -526,6 +547,10 @@ export default function Home() {
   useEffect(() => {
     setIsFiltersOpen(false);
   }, [activeFeed, searchQuery, selectedCategory, selectedState, selectedArea, userLocation]);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_PAGE_SIZE);
+  }, [searchQuery, activeFeed, selectedCategory, selectedState, selectedArea, selectedViewCount]);
 
   const baseFilteredStores = useMemo(() => {
     const query = normalizeText(searchQuery);
@@ -647,6 +672,12 @@ export default function Home() {
     selectedState !== 'all' ||
     selectedArea !== 'all';
   const locationReady = Boolean(userLocation);
+  const pagedStores = useMemo(() => visibleStores.slice(0, visibleCount), [visibleStores, visibleCount]);
+  const canLoadMore = visibleStores.length > visibleCount;
+
+  if (loading) {
+    return <VortexLoader />;
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.15),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(244,114,182,0.12),_transparent_28%),linear-gradient(180deg,_#fffdf7_0%,_#ffffff_38%,_#fff7ed_100%)] text-slate-900">
@@ -813,14 +844,14 @@ export default function Home() {
 
             <div className={`${isFiltersOpen ? 'mt-5 block' : 'mt-5 hidden'} space-y-4 lg:block`}>
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_auto_auto]">
-                <IconField iconPosition="left">
+                <IconField iconPosition="left" className="w-full min-w-0">
                   <InputIcon className="pi pi-search text-slate-400" />
                   <InputText
                     type="text"
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Search stores"
-                    className="w-full rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
+                    className="w-full rounded-2xl border border-amber-200 bg-white py-3 pl-11 pr-4 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
                   />
                 </IconField>
 
@@ -965,13 +996,14 @@ export default function Home() {
             </div>
 
             <div className="min-w-[16rem] rounded-[1.5rem] border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-              Showing <span className="text-slate-950">{visibleStores.length}</span> stores
+              Showing <span className="text-slate-950">{Math.min(visibleCount, visibleStores.length)}</span> of{' '}
+              <span className="text-slate-950">{visibleStores.length}</span> stores
             </div>
           </div>
 
           <div>
             {loading ? (
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, index) => (
                   <div key={index} className="overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm">
                     <div className="h-52 animate-pulse bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100" />
@@ -1014,10 +1046,23 @@ export default function Home() {
                 />
               </div>
             ) : (
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                {visibleStores.map((store) => (
-                  <StoreCard key={store._id} store={store} userLocation={userLocation} />
-                ))}
+              <div className="space-y-10">
+                <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  {pagedStores.map((store) => (
+                    <StoreCard key={store._id} store={store} userLocation={userLocation} />
+                  ))}
+                </div>
+
+                {canLoadMore && (
+                  <div className="flex justify-center">
+                    <Button
+                      label={`Load more (${Math.min(LOAD_MORE_STEP, visibleStores.length - visibleCount)} more)`}
+                      icon="pi pi-plus"
+                      onClick={() => setVisibleCount((current) => Math.min(current + LOAD_MORE_STEP, visibleStores.length))}
+                      className="border-none bg-slate-950 px-7 py-3 text-sm font-semibold text-white shadow-lg hover:bg-slate-900"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

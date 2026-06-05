@@ -404,13 +404,13 @@ export default function StoreDetails() {
       <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.16),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(244,114,182,0.10),_transparent_30%),linear-gradient(180deg,_#fffdf7_0%,_#ffffff_36%,_#fff7ed_100%)] text-slate-900">
         <Header />
 
-        <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
-          <div className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm" aria-hidden="true" />
+        <main className="relative flex min-h-[calc(100vh-80px)] items-start justify-center px-4 pb-10 pt-12 sm:items-center sm:px-6 sm:pt-16 sm:pb-16 lg:px-8">
+          <div className="fixed inset-0 z-30 bg-slate-950/55 backdrop-blur-sm" aria-hidden="true" />
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="store-access-title"
-            className="relative z-50 w-full max-w-xl overflow-hidden rounded-[2rem] border border-white/80 bg-white/88 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.16)] backdrop-blur-xl sm:p-8"
+            className="relative z-40 w-full max-w-xl overflow-hidden rounded-[2rem] border border-white/80 bg-white/88 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.16)] backdrop-blur-xl sm:p-8"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-amber-100/60 via-white/20 to-rose-100/50" />
             <div className="relative text-center">
@@ -569,12 +569,12 @@ export default function StoreDetails() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.16),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(244,114,182,0.10),_transparent_30%),linear-gradient(180deg,_#fffdf7_0%,_#ffffff_36%,_#fff7ed_100%)] text-slate-900">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.12),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(244,114,182,0.08),_transparent_35%),linear-gradient(180deg,_#fffdf7_0%,_#ffffff_60%)] text-slate-900">
       <Header />
 
-      <main className="flex-1 px-4 pb-12 pt-6 sm:px-6 sm:pb-16 sm:pt-8 lg:px-8 lg:pb-20">
-        <div className="mx-auto max-w-7xl">
-          <Link href="/store" className="mb-5 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white/85 px-4 py-2 text-sm font-semibold text-amber-700 shadow-sm backdrop-blur transition hover:-translate-y-0.5">
+      <main className="flex-1 px-3 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8">
+        <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
+          <Link href="/store" className="flex items-center">
             <Button
               icon="pi pi-arrow-left"
               label="Back to Stores"
@@ -583,7 +583,7 @@ export default function StoreDetails() {
             />
           </Link>
 
-          <section className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+          <section className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/85 shadow-[0_18px_50px_rgba(15,23,42,0.10)] backdrop-blur-xl">
             <div className="grid lg:grid-cols-[1.35fr_0.9fr] lg:items-stretch">
               <div className="flex min-h-[20rem] flex-col overflow-hidden lg:min-h-[28rem]">
                 {store.images && store.images.length > 0 ? (
@@ -592,7 +592,7 @@ export default function StoreDetails() {
                     numVisible={1}
                     numScroll={1}
                     itemTemplate={(item) => (
-                      <div className="relative h-[20rem] sm:h-[24rem] lg:h-[28rem] w-full overflow-hidden">
+                      <div className="relative h-[18rem] sm:h-[22rem] lg:h-[26rem] w-full overflow-hidden">
                         <img
                           src={item.url}
                           alt={`${store.storeName} image ${item.id + 1}`}
@@ -610,7 +610,7 @@ export default function StoreDetails() {
                     style={{ height: '100%', flex: 1 }}
                   />
                 ) : (
-                  <div className="flex h-[20rem] sm:h-[24rem] lg:h-[28rem] items-center justify-center bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 text-white">
+                  <div className="flex h-[18rem] sm:h-[22rem] lg:h-[26rem] items-center justify-center bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 text-white">
                     <div className="text-center">
                       <div className="text-6xl font-black tracking-[0.24em]">{getInitials(store.storeName)}</div>
                       <p className="mt-3 text-sm font-semibold uppercase tracking-[0.3em] text-white/80">Store banner</p>
@@ -643,14 +643,14 @@ export default function StoreDetails() {
                   </div>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl bg-slate-50 p-4">
+                    <div className="rounded-xl bg-slate-50 p-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Location</p>
                       <p className="mt-1 text-sm font-bold text-slate-950">{store.address.area}</p>
                       <p className="text-sm text-slate-600">
                         {store.address.state}, {store.address.country}
                       </p>
                     </div>
-                    <div className="rounded-2xl bg-slate-50 p-4">
+                    <div className="rounded-xl bg-slate-50 p-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Working hours</p>
                       <p className="mt-1 text-sm font-bold text-slate-950">
                         {store.timing.open} - {store.timing.close}
@@ -1088,12 +1088,12 @@ export default function StoreDetails() {
                 </p>
 
                 <div className="mt-5 grid gap-3">
-                  <div className="rounded-2xl bg-slate-50 p-4">
+                  <div className="rounded-xl bg-slate-50 p-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Owner</p>
                     <p className="mt-1 text-base font-bold text-slate-950">{store.userId.name}</p>
                     <p className="text-sm text-slate-600">{store.userId.phone}</p>
                   </div>
-                  <div className="rounded-2xl bg-slate-50 p-4">
+                  <div className="rounded-xl bg-slate-50 p-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Working hours</p>
                     <p className="mt-1 text-base font-bold text-slate-950">
                       {store.timing.open} - {store.timing.close}

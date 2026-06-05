@@ -184,41 +184,97 @@ export default function Header() {
 
   const authControls = !mounted ? (
     <div className="flex min-h-[3.25rem] items-center gap-3" aria-hidden="true">
-      <div className="h-11 w-32 animate-pulse rounded-full bg-slate-100" />
-      <div className="h-11 w-28 animate-pulse rounded-lg bg-slate-100" />
-    </div>
-  ) : authReady && authUser ? (
-    <div ref={menuRef} className="relative">
-      <button
-        type="button"
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen((v) => !v)}
-        className="flex items-center gap-2.5 rounded-3xl border border-amber-100 bg-white px-3 py-1.5 shadow-sm hover:shadow-md transition"
+    <div className="h-10 w-32 animate-pulse rounded-full bg-slate-100" />
+    <div className="h-10 w-28 animate-pulse rounded-lg bg-slate-100" />
+  </div>
+) : authReady && authUser ? (
+  <div ref={menuRef} className="relative">
+    
+    {/* PROFILE CHIP */}
+    <button
+      type="button"
+      aria-expanded={menuOpen}
+      onClick={() => setMenuOpen((v) => !v)}
+      className="
+        flex items-center gap-3
+        rounded-full
+        border border-slate-200
+        bg-white/70 backdrop-blur-md
+        px-2.5 py-1.5
+        shadow-sm
+        transition-all
+        hover:shadow-lg hover:scale-[1.02]
+        hover:border-yellow-300
+      "
+    >
+      {/* AVATAR */}
+      <div className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center
+        bg-gradient-to-br from-yellow-400 to-orange-500
+        text-white font-bold shadow-md ring-2 ring-white"
       >
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 text-sm font-bold text-white overflow-hidden ring-2 ring-white shadow-sm">
-          {authUser.picture ? (
-            <img src={authUser.picture} alt={authUser.name} className="h-full w-full object-cover" />
-          ) : (
-            displayInitials
-          )}
+        {authUser.picture ? (
+          <img
+            src={authUser.picture}
+            alt={authUser.name}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span className="text-xs">
+            {displayInitials}
+          </span>
+        )}
+      </div>
+
+      {/* TEXT (desktop only) */}
+      <div className="hidden sm:flex flex-col leading-tight max-w-[140px]">
+        <span className="text-sm font-semibold text-slate-900 truncate">
+          {displayName}
         </span>
-
-        <span className="hidden min-w-0 flex-col px-2 py-1 sm:flex">
-          <span className="truncate text-sm font-semibold text-slate-900">{displayName}</span>
-          <span className="truncate text-xs text-slate-500">{authUser.email}</span>
+        <span className="text-[11px] text-slate-500 truncate">
+          {authUser.email}
         </span>
+      </div>
 
-        <svg className="mr-1 h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-        </svg>
-      </button>
+      {/* DROPDOWN ICON */}
+      <svg
+        className={`h-4 w-4 text-slate-400 transition-transform ${
+          menuOpen ? "rotate-180" : ""
+        }`}
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
+        <path
+          fillRule="evenodd"
+          d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
+          clipRule="evenodd"
+        />
+      </svg>
+    </button>
 
-      {menuOpen && (
-        <div className="absolute right-0 z-50 mt-2 w-44 overflow-hidden rounded-lg border border-slate-100 bg-white shadow-lg">
-          <button onClick={handleLogout} className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">Logout</button>
+    {/* DROPDOWN */}
+    {menuOpen && (
+      <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl">
+        
+        {/* USER INFO */}
+        <div className="px-4 py-3 bg-slate-50 border-b">
+          <p className="text-sm font-semibold text-slate-900 truncate">
+            {displayName}
+          </p>
+          <p className="text-xs text-slate-500 truncate">
+            {authUser.email}
+          </p>
         </div>
-      )}
-    </div>
+
+        {/* LOGOUT */}
+        <button
+          onClick={handleLogout}
+          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition"
+        >
+          Logout
+        </button>
+      </div>
+    )}
+  </div>
   ) : (
     <>
       <div className="min-w-0">
