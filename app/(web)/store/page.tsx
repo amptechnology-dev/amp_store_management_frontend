@@ -1,16 +1,21 @@
-'use client';
+"use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
-import dynamic from 'next/dynamic';
-import Link from 'next/link';
-import { Button } from 'primereact/button';
-import { InputText } from 'primereact/inputtext';
-import { IconField } from 'primereact/iconfield';
-import { InputIcon } from 'primereact/inputicon';
-import axiosInstance from '@/service/axios.service';
-import VortexLoader from '@/app/(web)/components/VortexLoader';
-const Header = dynamic(() => import('../components/Header'), { ssr: false });
-const Footer = dynamic(() => import('../components/Footer'), { ssr: false });
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  useRef,
+} from "react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import axiosInstance from "@/service/axios.service";
+import VortexLoader from "@/app/(web)/components/VortexLoader";
+
+const Header = dynamic(() => import("../components/Header"), { ssr: false });
+const Footer = dynamic(() => import("../components/Footer"), { ssr: false });
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface StoreReview {
   rating?: number;
@@ -23,21 +28,9 @@ interface Store {
   storeType: string;
   isFeatured?: boolean;
   viewCount?: number;
-  userId: {
-    _id: string;
-    name: string;
-    email: string;
-    phone: string;
-  };
-  address: {
-    area: string;
-    state: string;
-    country: string;
-  };
-  timing: {
-    open: string;
-    close: string;
-  };
+  userId: { _id: string; name: string; email: string; phone: string };
+  address: { area: string; state: string; country: string };
+  timing: { open: string; close: string };
   contactNo: string;
   whatsappNo: string;
   email: string;
@@ -55,363 +48,554 @@ interface Store {
 }
 
 type FeedMode =
-  | 'all'
-  | 'featured'
-  | 'newest'
-  | 'topViewed'
-  | 'popular'
-  | 'topRated'
-  | 'nearby'
-  | 'gst'
-  | 'random';
+  | "all"
+  | "featured"
+  | "topViewed"
+  | "topRated"
+  | "gst"
+  | "random";
 
-type ViewCountFilter = 'all' | '1' | '5' | '10' | '20';
+// ─── Static Data ──────────────────────────────────────────────────────────────
 
-type LocationPoint = {
-  latitude: number;
-  longitude: number;
-};
-
-const fallbackImage = 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=1200&h=900&fit=crop';
-
-const feedModes: Array<{ key: FeedMode; label: string; description: string; icon: string }> = [
-  { key: 'all', label: 'All Stores', description: 'Show everything', icon: 'pi-th-large' },
-  { key: 'featured', label: 'Featured Stores', description: 'Promoted or trusted', icon: 'pi-star-fill' },
-  { key: 'newest', label: 'Newest Stores', description: 'Freshly opened', icon: 'pi-clock' },
-  { key: 'topViewed', label: 'Top Viewed', description: 'Most watched stores', icon: 'pi-eye' },
-  { key: 'popular', label: 'Popular Stores', description: 'Viewed and loved', icon: 'pi-chart-line' },
-  { key: 'topRated', label: 'Top Rated Stores', description: 'Best reviews', icon: 'pi-thumbs-up' },
-  { key: 'nearby', label: 'Nearby Stores', description: 'Around your location', icon: 'pi-map-marker' },
-  { key: 'gst', label: 'GST Verified', description: 'Tax verified shops', icon: 'pi-id-card' },
-  { key: 'random', label: 'Explore Random', description: 'Discover something new', icon: 'pi-refresh' },
+const CATEGORY_ICONS = [
+  {
+    label: "Restaurants",
+    icon: "https://cdn-icons-png.flaticon.com/64/3075/3075977.png",
+  },
+  {
+    label: "Hotels",
+    icon: "https://cdn-icons-png.flaticon.com/64/2933/2933824.png",
+  },
+  {
+    label: "Beauty Spa",
+    icon: "https://cdn-icons-png.flaticon.com/64/3081/3081840.png",
+  },
+  {
+    label: "Home Decor",
+    icon: "https://cdn-icons-png.flaticon.com/64/1670/1670088.png",
+  },
+  {
+    label: "Wedding Planning",
+    icon: "https://cdn-icons-png.flaticon.com/64/2961/2961948.png",
+  },
+  {
+    label: "Education",
+    icon: "https://cdn-icons-png.flaticon.com/64/3976/3976625.png",
+  },
+  {
+    label: "Rent & Hire",
+    icon: "https://cdn-icons-png.flaticon.com/64/619/619153.png",
+  },
+  {
+    label: "Hospitals",
+    icon: "https://cdn-icons-png.flaticon.com/64/2382/2382461.png",
+  },
+  {
+    label: "Contractors",
+    icon: "https://cdn-icons-png.flaticon.com/64/1048/1048945.png",
+  },
+  {
+    label: "Pet Shops",
+    icon: "https://cdn-icons-png.flaticon.com/64/2138/2138508.png",
+  },
+  {
+    label: "Groceries",
+    icon: "https://cdn-icons-png.flaticon.com/64/1261/1261163.png",
+  },
+  {
+    label: "Electronics",
+    icon: "https://cdn-icons-png.flaticon.com/64/2586/2586488.png",
+  },
 ];
 
-const viewCountFilters: Array<{ key: ViewCountFilter; label: string; description: string }> = [
-  { key: 'all', label: 'All views', description: 'No view filter' },
-  { key: '1', label: '1+ views', description: 'At least one view' },
-  { key: '5', label: '5+ views', description: 'Moderately watched' },
-  { key: '10', label: '10+ views', description: 'Well watched' },
-  { key: '20', label: '20+ views', description: 'Highly watched' },
+const HERO_SLIDES = [
+  {
+    id: 1,
+    image:
+      "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=900&h=460&fit=crop",
+    headline: "Time to fly at\nLowest Airfares",
+    cta: "Book Now",
+    brand: "Powered by EaseMyTrip",
+    overlayColor: "rgba(14,116,144,0.55)",
+  },
+  {
+    id: 2,
+    image:
+      "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=900&h=460&fit=crop",
+    headline: "Search, compare\n& book hotels",
+    cta: "Get Best Deals",
+    brand: "Powered by AMP Stays",
+    overlayColor: "rgba(92,45,145,0.55)",
+  },
+  {
+    id: 3,
+    image:
+      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=900&h=460&fit=crop",
+    headline: "Best Restaurants\nNear You",
+    cta: "Explore Now",
+    brand: "Powered by AMP Eats",
+    overlayColor: "rgba(15,118,110,0.55)",
+  },
+  {
+    id: 4,
+    image:
+      "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=900&h=460&fit=crop",
+    headline: "Shop Local\nBusiness Deals",
+    cta: "Browse Stores",
+    brand: "Powered by AMP Stores",
+    overlayColor: "rgba(180,83,9,0.55)",
+  },
 ];
 
-const STATE_LABEL_ALIASES: Record<string, string> = {
-  westbengal: 'West Bengal',
-};
+const SERVICE_CARDS = [
+  {
+    id: 1,
+    label: "B2B",
+    sub: "Quick Quotes",
+    bg: "#1a56db",
+    image:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop&crop=faces",
+  },
+  {
+    id: 2,
+    label: "Repairs & Services",
+    sub: "Get Nearest Vendor",
+    bg: "#7e3af2",
+    image:
+      "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&h=400&fit=crop",
+  },
+  {
+    id: 3,
+    label: "Real Estate",
+    sub: "Finest Agents",
+    bg: "#1c64f2",
+    image:
+      "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=300&h=400&fit=crop",
+  },
+  {
+    id: 4,
+    label: "Doctors",
+    sub: "Book Now",
+    bg: "#057a55",
+    image:
+      "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=300&h=400&fit=crop&crop=faces",
+  },
+];
 
-const normalizeText = (value: unknown) =>
-  String(value ?? '')
+const FEED_MODES: Array<{ key: FeedMode; label: string; icon: string }> = [
+  { key: "all", label: "All Stores", icon: "pi-th-large" },
+  { key: "featured", label: "Featured", icon: "pi-star-fill" },
+  { key: "topViewed", label: "Top Viewed", icon: "pi-eye" },
+  { key: "topRated", label: "Top Rated", icon: "pi-thumbs-up" },
+  { key: "gst", label: "GST Verified", icon: "pi-id-card" },
+  { key: "random", label: "Random", icon: "pi-refresh" },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const fallbackImage =
+  "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&h=600&fit=crop";
+const normalizeText = (v: unknown) =>
+  String(v ?? "")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '')
+    .replace(/[^a-z0-9]+/g, "")
     .trim();
-
-const titleCaseWords = (value: string) =>
-  value
+const titleCase = (v: string) =>
+  v
     .trim()
-    .replace(/\s+/g, ' ')
+    .replace(/\s+/g, " ")
     .toLowerCase()
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-
-const canonicalizeState = (value?: string) => {
-  const trimmed = value?.trim();
-  if (!trimmed) {
-    return '';
-  }
-
-  const normalized = normalizeText(trimmed);
-  return STATE_LABEL_ALIASES[normalized] || titleCaseWords(trimmed);
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+const STATE_ALIASES: Record<string, string> = { westbengal: "West Bengal" };
+const canonicalizeState = (v?: string) => {
+  const t = v?.trim();
+  if (!t) return "";
+  const n = normalizeText(t);
+  return STATE_ALIASES[n] || titleCase(t);
 };
-
-const parseStoreTimeToMinutes = (value: string) => {
-  const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
-  const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/);
-
-  if (!match) {
-    return null;
-  }
-
-  let hours = Number(match[1]);
-  const minutes = Number(match[2] || '0');
-  const period = match[3];
-
-  if (period === 'AM') {
-    hours = hours === 12 ? 0 : hours;
-  } else {
-    hours = hours === 12 ? 12 : hours + 12;
-  }
-
-  return hours * 60 + minutes;
+const parseTimeToMin = (v: string) => {
+  const n = v.trim().toUpperCase().replace(/\s+/g, "");
+  const m = n.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = Number(m[2] || "0");
+  if (m[3] === "AM") h = h === 12 ? 0 : h;
+  else h = h === 12 ? 12 : h + 12;
+  return h * 60 + min;
 };
-
-const isStoreOpenNow = (openTime: string, closeTime: string) => {
-  const openMinutes = parseStoreTimeToMinutes(openTime);
-  const closeMinutes = parseStoreTimeToMinutes(closeTime);
-
-  if (openMinutes === null || closeMinutes === null) {
-    return false;
-  }
-
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-  if (openMinutes === closeMinutes) {
-    return true;
-  }
-
-  if (openMinutes < closeMinutes) {
-    return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
-  }
-
-  return currentMinutes >= openMinutes || currentMinutes < closeMinutes;
+const isOpenNow = (open: string, close: string) => {
+  const o = parseTimeToMin(open);
+  const c = parseTimeToMin(close);
+  if (o === null || c === null) return false;
+  const now = new Date().getHours() * 60 + new Date().getMinutes();
+  if (o === c) return true;
+  return o < c ? now >= o && now < c : now >= o || now < c;
 };
-
-const toNumber = (value: unknown, fallback = 0) => {
-  const parsed = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+const toNum = (v: unknown, fb = 0) => {
+  const p = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(p) ? p : fb;
 };
-
-const toTimestamp = (value?: string) => {
-  if (!value) {
-    return 0;
-  }
-
-  const timestamp = new Date(value).getTime();
-  return Number.isFinite(timestamp) ? timestamp : 0;
+const toTs = (v?: string) => {
+  if (!v) return 0;
+  const t = new Date(v).getTime();
+  return Number.isFinite(t) ? t : 0;
 };
-
-const getAverageRating = (store: Store) => {
-  const reviews = store.reviews || [];
-
-  if (reviews.length === 0) {
-    return 0;
-  }
-
-  const total = reviews.reduce((sum, review) => sum + (Number(review.rating) || 0), 0);
-  return total / reviews.length;
+const avgRating = (s: Store) => {
+  const r = s.reviews || [];
+  if (!r.length) return 0;
+  return r.reduce((sum, rv) => sum + (Number(rv.rating) || 0), 0) / r.length;
 };
-
-const getReviewCount = (store: Store) => store.reviews?.length || 0;
-
-const renderRatingStars = (rating: number) => {
-  const roundedRating = Math.max(0, Math.min(5, rating));
-
-  return Array.from({ length: 5 }, (_, index) => {
-    const filled = index < Math.round(roundedRating);
-
-    return (
-      <i
-        key={index}
-        className={`pi ${filled ? 'pi-star-fill' : 'pi-star'} text-[0.72rem] ${filled ? 'text-amber-500' : 'text-slate-300'}`}
-      />
-    );
-  });
-};
-
-const getInitials = (name: string) => {
-  const pieces = name.split(' ').filter(Boolean);
-
-  if (pieces.length === 0) {
-    return 'ST';
-  }
-
-  return pieces
-    .map((piece) => piece[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-};
-
-const stringToBg = (str: string) => {
-  const colors = [
-    'bg-gradient-to-br from-rose-500 to-orange-500',
-    'bg-gradient-to-br from-sky-500 to-cyan-500',
-    'bg-gradient-to-br from-emerald-500 to-teal-500',
-    'bg-gradient-to-br from-violet-500 to-fuchsia-500',
-    'bg-gradient-to-br from-amber-500 to-yellow-500',
-    'bg-gradient-to-br from-indigo-500 to-blue-500',
-    'bg-gradient-to-br from-lime-500 to-green-500',
-    'bg-gradient-to-br from-pink-500 to-red-500',
-  ];
-
-  const index = Math.abs(str.charCodeAt(0)) % colors.length;
-  return colors[index];
-};
-
-const hasGst = (store: Store) => Boolean((store as Store & { gstin?: string }).gstin?.trim());
-
-const isFeaturedStore = (store: Store) => Boolean(store.isFeatured);
-
-const getStoreDiscoveryScore = (store: Store) => {
-  const rating = getAverageRating(store);
-  const reviewCount = getReviewCount(store);
-  const ageInDays = Math.max(0, (Date.now() - toTimestamp(store.createdAt)) / 86400000);
-  const recencyBonus = Math.max(0, 80 - ageInDays);
-
+const reviewCount = (s: Store) => s.reviews?.length || 0;
+const hasGst = (s: Store) => Boolean(s.gstin?.trim());
+const discoveryScore = (s: Store) => {
+  const age = Math.max(0, (Date.now() - toTs(s.createdAt)) / 86400000);
   return (
-    (store.isFeatured ? 70 : 0) +
-    (store.isVerify ? 60 : 0) +
-    (hasGst(store) ? 12 : 0) +
-    (store.isActive ? 8 : 0) +
-    rating * 15 +
-    Math.min(reviewCount, 20) * 2 +
-    recencyBonus
+    (s.isFeatured ? 70 : 0) +
+    (s.isVerify ? 60 : 0) +
+    (hasGst(s) ? 12 : 0) +
+    (s.isActive ? 8 : 0) +
+    avgRating(s) * 15 +
+    Math.min(reviewCount(s), 20) * 2 +
+    Math.max(0, 80 - age)
   );
 };
 
-const getPopularityScore = (store: Store) => {
-  const rating = getAverageRating(store);
-  const reviewCount = getReviewCount(store);
-  const ageInDays = Math.max(0, (Date.now() - toTimestamp(store.createdAt)) / 86400000);
-
-  return reviewCount * 9 + rating * 20 + (store.isVerify ? 8 : 0) + (store.isActive ? 6 : 0) + Math.max(0, 90 - ageInDays);
-};
-
-const getDistanceKm = (userLocation: LocationPoint, store: Store) => {
-  if (!Number.isFinite(store.lat) || !Number.isFinite(store.long) || (store.lat === 0 && store.long === 0)) {
-    return null;
-  }
-
-  const earthRadiusKm = 6371;
-  const dLat = ((store.lat - userLocation.latitude) * Math.PI) / 180;
-  const dLon = ((store.long - userLocation.longitude) * Math.PI) / 180;
-  const lat1 = (userLocation.latitude * Math.PI) / 180;
-  const lat2 = (store.lat * Math.PI) / 180;
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return earthRadiusKm * c;
-};
-
-const formatDistance = (distanceKm: number) => {
-  if (!Number.isFinite(distanceKm)) {
-    return 'Nearby';
-  }
-
-  if (distanceKm < 1) {
-    return `${Math.max(100, Math.round(distanceKm * 1000))} m away`;
-  }
-
-  return `${distanceKm.toFixed(distanceKm < 10 ? 1 : 0)} km away`;
-};
-
-const sortRandomly = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
-
-function StoreCard({ store, userLocation }: { store: Store; userLocation: LocationPoint | null }) {
-  const rating = getAverageRating(store);
-  const reviewCount = getReviewCount(store);
-  const viewCount = toNumber(store.viewCount);
-  const distance = userLocation ? getDistanceKm(userLocation, store) : null;
-  const openNow = store.isActive && isStoreOpenNow(store.timing?.open || '', store.timing?.close || '');
-  const ownerName = store.userId?.name || 'Owner not set';
-  const storeTypeLabel = store.storeType?.trim();
-  const locationLabel = [store.address?.area?.trim(), store.address?.state?.trim(), store.address?.country?.trim()]
+const initials = (name: string) =>
+  name
+    .split(" ")
     .filter(Boolean)
-    .join(', ');
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "ST";
+const GRADIENTS = [
+  "from-rose-500 to-orange-500",
+  "from-sky-500 to-cyan-500",
+  "from-emerald-500 to-teal-500",
+  "from-violet-500 to-fuchsia-500",
+  "from-amber-500 to-yellow-500",
+  "from-indigo-500 to-blue-500",
+];
+const storeGradient = (name: string) =>
+  GRADIENTS[Math.abs(name.charCodeAt(0)) % GRADIENTS.length];
+const renderStars = (rating: number) =>
+  Array.from({ length: 5 }, (_, i) => (
+    <i
+      key={i}
+      className={`pi ${i < Math.round(rating) ? "pi-star-fill text-amber-400" : "pi-star text-slate-300"} text-[11px]`}
+    />
+  ));
+
+// ─── HeroBanner ───────────────────────────────────────────────────────────────
+
+function HeroBanner() {
+  const [current, setCurrent] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setCurrent((p) => (p + 1) % HERO_SLIDES.length);
+    }, 4500);
+  }, []);
+
+  useEffect(() => {
+    startTimer();
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [startTimer]);
+
+  const go = (idx: number) => {
+    setCurrent(idx);
+    startTimer();
+  };
+  const prev = () => {
+    setCurrent((p) => (p - 1 + HERO_SLIDES.length) % HERO_SLIDES.length);
+    startTimer();
+  };
+  const next = () => {
+    setCurrent((p) => (p + 1) % HERO_SLIDES.length);
+    startTimer();
+  };
+  const slide = HERO_SLIDES[current];
 
   return (
-    <article className="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-3xl border border-slate-200/70 bg-white/90 shadow-[0_16px_50px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-1 hover:border-amber-200/80 hover:shadow-[0_26px_80px_rgba(15,23,42,0.14)] focus-within:ring-2 focus-within:ring-amber-400/60">
+    /* Outer wrapper — matches JD's banner section proportions */
+    <div className="flex gap-3">
+      {/* ── LEFT: Wide Slider (roughly 57% width like JD) ── */}
+      <div
+        className="relative flex-1 min-w-0 overflow-hidden rounded-2xl"
+        style={{ height: 230 }}
+      >
+        {HERO_SLIDES.map((s, idx) => (
+          <div
+            key={s.id}
+            className="absolute inset-0 transition-opacity duration-700"
+            style={{
+              opacity: idx === current ? 1 : 0,
+              zIndex: idx === current ? 1 : 0,
+            }}
+          >
+            <img
+              src={s.image}
+              alt=""
+              className="h-full w-full object-cover"
+              onError={(e: any) => {
+                e.target.src = fallbackImage;
+              }}
+            />
+            {/* colour tint overlay */}
+            <div
+              className="absolute inset-0"
+              style={{ background: s.overlayColor }}
+            />
+          </div>
+        ))}
+
+        {/* text */}
+        <div className="absolute inset-0 z-10 flex flex-col justify-end p-6">
+          <h2
+            className="text-2xl font-black leading-tight text-white drop-shadow sm:text-3xl"
+            style={{ whiteSpace: "pre-line" }}
+          >
+            {slide.headline}
+          </h2>
+          <div className="mt-3 flex items-center gap-4">
+            <button className="rounded border-2 border-white px-5 py-1.5 text-sm font-bold text-white transition hover:bg-white hover:text-slate-900">
+              {slide.cta}
+            </button>
+            <span className="text-xs font-semibold text-white/70">
+              {slide.brand}
+            </span>
+          </div>
+          {/* dots */}
+          <div className="mt-4 flex gap-2">
+            {HERO_SLIDES.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => go(idx)}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  idx === current ? "w-6 bg-white" : "w-2 bg-white/40"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* arrows */}
+        <button
+          onClick={prev}
+          className="absolute left-2 top-1/2 z-20 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50"
+        >
+          <i className="pi pi-chevron-left text-xs" />
+        </button>
+        <button
+          onClick={next}
+          className="absolute right-2 top-1/2 z-20 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50"
+        >
+          <i className="pi pi-chevron-right text-xs" />
+        </button>
+      </div>
+
+      {/* ── RIGHT: 4 Tall Service Cards (roughly 43% width, 2×2 grid) ── */}
+      <div
+        className="hidden sm:grid grid-cols-2 gap-2 shrink-0"
+        style={{ width: "43%", height: 230 }}
+      >
+        {SERVICE_CARDS.map((card) => (
+          <div
+            key={card.id}
+            className="relative overflow-hidden rounded-xl cursor-pointer group"
+            style={{ background: card.bg }}
+          >
+            {/* person image — right-aligned, bottom-anchored like JD */}
+            <img
+              src={card.image}
+              alt={card.label}
+              className="absolute bottom-0 right-0 h-full w-auto object-cover object-top opacity-75 group-hover:opacity-90 transition-opacity"
+              onError={(e: any) => {
+                e.target.style.display = "none";
+              }}
+            />
+            {/* text */}
+            <div className="relative z-10 p-3">
+              <p className="text-[11px] font-semibold text-white/75 leading-tight">
+                {card.sub}
+              </p>
+              <h3 className="mt-0.5 text-[15px] font-black leading-tight text-white">
+                {card.label}
+              </h3>
+            </div>
+            {/* arrow badge — bottom left like JD */}
+            <div className="absolute bottom-3 left-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white group-hover:bg-white/35 transition">
+              <i className="pi pi-chevron-right text-[10px]" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── CategoryGrid (Just Dial icon boxes) ──────────────────────────────────────
+
+function CategoryGrid({
+  activeTab,
+  onTabChange,
+}: {
+  activeTab: string;
+  onTabChange: (label: string) => void;
+}) {
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+      {/* "All" tile */}
+      <button
+        onClick={() => onTabChange("all")}
+        className={`flex shrink-0 flex-col items-center gap-2 rounded-xl border px-3 py-3 transition hover:border-orange-400 hover:shadow-sm ${
+          activeTab === "all"
+            ? "border-orange-400 bg-orange-50"
+            : "border-slate-200 bg-white"
+        }`}
+        style={{ minWidth: 76 }}
+      >
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-2xl">
+          🏠
+        </div>
+        <span className="text-center text-[11px] font-semibold leading-tight text-slate-700">
+          All
+        </span>
+      </button>
+
+      {CATEGORY_ICONS.map((cat) => (
+        <button
+          key={cat.label}
+          onClick={() =>
+            onTabChange(activeTab === cat.label ? "all" : cat.label)
+          }
+          className={`flex shrink-0 flex-col items-center gap-2 rounded-xl border px-3 py-3 transition hover:border-orange-400 hover:shadow-sm ${
+            activeTab === cat.label
+              ? "border-orange-400 bg-orange-50"
+              : "border-slate-200 bg-white"
+          }`}
+          style={{ minWidth: 76 }}
+        >
+          <img
+            src={cat.icon}
+            alt={cat.label}
+            className="h-11 w-11 object-contain"
+            onError={(e: any) => {
+              e.target.style.display = "none";
+            }}
+          />
+          <span className="text-center text-[11px] font-semibold leading-tight text-slate-700">
+            {cat.label}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── StoreCard ────────────────────────────────────────────────────────────────
+
+function StoreCard({
+  store,
+}: {
+  store: Store;
+}) {
+  const rating = avgRating(store);
+  const reviews = reviewCount(store);
+  const views = toNum(store.viewCount);
+  const open =
+    store.isActive &&
+    isOpenNow(store.timing?.open || "", store.timing?.close || "");
+  const owner = store.userId?.name || "—";
+  const location = [store.address?.area, store.address?.state]
+    .filter(Boolean)
+    .join(", ");
+
+  return (
+    <article className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
       <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
         {store.images?.length > 0 ? (
           <img
             src={store.images[0]}
-            alt={`${store.storeName} store banner`}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.06]"
-            onError={(event: any) => {
-              event.target.src = fallbackImage;
+            alt={store.storeName}
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            onError={(e: any) => {
+              e.target.src = fallbackImage;
             }}
           />
         ) : (
-          <div className={`flex h-full items-center justify-center text-white ${stringToBg(store.storeName)}`}>
+          <div
+            className={`flex h-full items-center justify-center bg-gradient-to-br ${storeGradient(store.storeName)} text-white`}
+          >
             <div className="text-center">
-              <div className="text-4xl font-black tracking-[0.2em]">{getInitials(store.storeName)}</div>
-              <div className="mt-2 text-xs uppercase tracking-[0.3em] text-white/80">Local store</div>
+              <div className="text-3xl font-black tracking-widest">
+                {initials(store.storeName)}
+              </div>
+              <div className="mt-1 text-[10px] uppercase tracking-widest text-white/70">
+                Store
+              </div>
             </div>
           </div>
         )}
-
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/15 to-transparent" />
-
-        <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-          {isFeaturedStore(store) && (
-            <span className="rounded-full bg-white/95 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700 shadow-lg backdrop-blur">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+        <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+          {store.isFeatured && (
+            <span className="rounded-full bg-amber-400 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
               Featured
             </span>
           )}
           {hasGst(store) && (
-            <span className="rounded-full bg-emerald-500/95 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white shadow-lg">
-              GST Verified
+            <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+              GST ✓
             </span>
           )}
         </div>
-
-        <div className="absolute right-3 top-3 flex flex-col items-end gap-2">
-          {distance !== null && (
-            <span className="rounded-full bg-white/95 px-3 py-1 text-[11px] font-semibold text-slate-800 shadow-lg">
-              {formatDistance(distance)}
-            </span>
-          )}
+        <div
+          className={`absolute bottom-3 left-3 flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
+            open ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-300"
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${open ? "bg-white" : "bg-slate-400"}`}
+          />
+          {open ? "Open" : "Closed"}
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 p-5 sm:p-6">
-        <div className="space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              {storeTypeLabel && (
-                <div className="mb-2 inline-flex items-center gap-2">
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-700">
-                    {storeTypeLabel}
-                  </span>
-                </div>
-              )}
-              <h4 className="text-[1.12rem] font-black leading-snug text-slate-950 sm:text-[1.22rem]">{store.storeName}</h4>
-              <p className="mt-2 text-sm font-medium text-slate-700">
-                Owner: <span className="font-semibold text-slate-950">{ownerName}</span>
-              </p>
-            </div>
-
-            <div
-              className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${openNow ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-                }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${openNow ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-              {openNow ? 'Open now' : 'Closed'}
-            </div>
-          </div>
-
-          {store.description?.trim() && (
-            <p className="text-sm leading-6 text-slate-600 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
-              {store.description.trim()}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-              <span className="inline-flex items-center gap-0.5">{renderRatingStars(rating)}</span>
-              <span>{reviewCount > 0 ? rating.toFixed(1) : 'No ratings yet'}</span>
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-              <i className="pi pi-eye" />
-              {viewCount} {viewCount === 1 ? 'view' : 'views'}
-            </span>
-          </div>
+      <div className="flex flex-1 flex-col gap-3 p-4">
+                <div>
+          <h4 className="line-clamp-1 text-[1.05rem] font-bold leading-snug text-slate-900">
+            {store.storeName}
+          </h4>
         </div>
-
-        <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <p className="min-w-0 text-xs font-medium text-slate-500 truncate" title={locationLabel || undefined}>
-            {locationLabel || 'Location not set'}
+        <div className="flex items-center gap-3 text-xs font-semibold text-slate-600">
+          <span className="flex items-center gap-1">
+            {renderStars(rating)}
+            <span className="ml-1 text-slate-700">
+              {reviews > 0 ? `${rating.toFixed(1)} (${reviews})` : "No reviews"}
+            </span>
+          </span>
+          <span className="text-slate-400">·</span>
+          <span className="flex items-center gap-1">
+            <i className="pi pi-eye text-slate-400" />
+            {views}
+          </span>
+        </div>
+        <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-3">
+          <p
+            className="min-w-0 truncate text-xs text-slate-500"
+            title={location}
+          >
+            📍 {location || "Location not set"}
           </p>
-
           <Link href={`/store/${store._id}`} className="shrink-0">
-            <Button
-              label="View details"
-              icon="pi pi-arrow-right"
-              iconPos="right"
-              rounded
-              className="border-none bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5"
-            />
+            <button className="rounded-full bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700">
+              View →
+            </button>
           </Link>
         </div>
       </div>
@@ -419,687 +603,451 @@ function StoreCard({ store, userLocation }: { store: Store; userLocation: Locati
   );
 }
 
+function SkeletonCard() {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="h-44 animate-pulse bg-slate-100" />
+      <div className="space-y-3 p-4">
+        <div className="h-3 w-1/3 animate-pulse rounded-full bg-slate-100" />
+        <div className="h-4 w-3/4 animate-pulse rounded-full bg-slate-100" />
+        <div className="h-3 w-1/2 animate-pulse rounded-full bg-slate-100" />
+        <div className="h-10 animate-pulse rounded-xl bg-slate-100" />
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+const INITIAL_SIZE = 12;
+const LOAD_STEP = 12;
+
 export default function Home() {
-  const INITIAL_PAGE_SIZE = 9;
-  const LOAD_MORE_STEP = 9;
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeFeed, setActiveFeed] = useState<FeedMode>('all');
-  const [selectedViewCount, setSelectedViewCount] = useState<ViewCountFilter>('all');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedState, setSelectedState] = useState('all');
-  const [selectedArea, setSelectedArea] = useState('all');
-  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [location, setLocation] = useState("");
+  const [activeFeed, setActiveFeed] = useState<FeedMode>("all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedState, setSelectedState] = useState("all");
+  const [selectedArea, setSelectedArea] = useState("all");
   const [allStores, setAllStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userLocation, setUserLocation] = useState<LocationPoint | null>(null);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
-  
+  const [visibleCount, setVisibleCount] = useState(INITIAL_SIZE);
+  const [activeCategoryTab, setActiveCategoryTab] = useState("all");
 
+  // fetch
   useEffect(() => {
-    const fetchStores = async () => {
+    (async () => {
       try {
         setLoading(true);
-        setError(null);
-
-        const response = await axiosInstance.get('/api/register/public-all-stores');
-        const stores = response.data.stores || [];
-        setAllStores(stores);
-      } catch (fetchError) {
-        console.error('Error fetching stores:', fetchError);
-        setError('Failed to load stores. Please try again later.');
-        setAllStores([]);
+        const res = await axiosInstance.get("/api/register/public-all-stores");
+        setAllStores(res.data.stores || []);
+      } catch {
+        setError("Failed to load stores. Please try again.");
       } finally {
         setLoading(false);
       }
-    };
-
-    void fetchStores();
+    })();
   }, []);
-
-  const requestLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationError('Your browser does not support location access.');
-      return;
-    }
-
-    setLocationLoading(true);
-    setLocationError(null);
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setUserLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-        setLocationLoading(false);
-      },
-      (geoError) => {
-        setLocationError(
-          geoError.code === geoError.PERMISSION_DENIED
-            ? 'Location access denied. Enable it to sort nearby stores.'
-            : 'Unable to fetch your location right now.'
-        );
-        setLocationLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    );
-  };
 
   useEffect(() => {
-    requestLocation();
-  }, []);
+    setVisibleCount(INITIAL_SIZE);
+  }, [
+    search,
+    location,
+    activeFeed,
+    selectedCategory,
+    selectedState,
+    selectedArea,
+    activeCategoryTab,
+  ]);
 
   const uniqueCategories = useMemo(
-    () => Array.from(new Set(allStores.map((store) => store.storeType?.trim()).filter(Boolean))).sort(),
-    [allStores]
+    () =>
+      Array.from(
+        new Set(allStores.map((s) => s.storeType?.trim()).filter(Boolean)),
+      ).sort(),
+    [allStores],
   );
 
-  const uniqueStates = useMemo(
-    () => {
-      const stateMap = new Map<string, string>();
-
-      allStores.forEach((store) => {
-        const stateLabel = canonicalizeState(store.address?.state);
-        if (!stateLabel) {
-          return;
-        }
-
-        const normalizedState = normalizeText(stateLabel);
-        if (!stateMap.has(normalizedState)) {
-          stateMap.set(normalizedState, stateLabel);
-        }
-      });
-
-      return Array.from(stateMap.values()).sort((left, right) => left.localeCompare(right));
-    },
-    [allStores]
-  );
+  const uniqueStates = useMemo(() => {
+    const map = new Map<string, string>();
+    allStores.forEach((s) => {
+      const label = canonicalizeState(s.address?.state);
+      if (!label) return;
+      const key = normalizeText(label);
+      if (!map.has(key)) map.set(key, label);
+    });
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
+  }, [allStores]);
 
   const uniqueAreas = useMemo(() => {
-    const scopedStores = selectedState === 'all'
-      ? allStores
-      : allStores.filter((store) => normalizeText(canonicalizeState(store.address?.state)) === normalizeText(selectedState));
-
-    const areaMap = new Map<string, string>();
-
-    scopedStores.forEach((store) => {
-      const areaLabel = store.address?.area?.trim();
-      if (!areaLabel) {
-        return;
-      }
-
-      const normalizedArea = normalizeText(areaLabel);
-      if (!areaMap.has(normalizedArea)) {
-        areaMap.set(normalizedArea, areaLabel);
-      }
+    const scoped =
+      selectedState === "all"
+        ? allStores
+        : allStores.filter(
+            (s) =>
+              normalizeText(canonicalizeState(s.address?.state)) ===
+              normalizeText(selectedState),
+          );
+    const map = new Map<string, string>();
+    scoped.forEach((s) => {
+      const area = s.address?.area?.trim();
+      if (!area) return;
+      const key = normalizeText(area);
+      if (!map.has(key)) map.set(key, area);
     });
-
-    return Array.from(areaMap.values()).sort((left, right) => left.localeCompare(right));
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
   }, [allStores, selectedState]);
 
   useEffect(() => {
-    setSelectedArea('all');
+    setSelectedArea("all");
   }, [selectedState]);
 
-  useEffect(() => {
-    setIsFiltersOpen(false);
-  }, [activeFeed, searchQuery, selectedCategory, selectedState, selectedArea, userLocation]);
+  const visibleStores = useMemo(() => {
+    const q = normalizeText(search);
+    const catKey = normalizeText(selectedCategory);
+    const stateKey =
+      selectedState === "all" ? "" : normalizeText(selectedState);
+    const areaKey = selectedArea === "all" ? "" : normalizeText(selectedArea);
+    const tabKey =
+      activeCategoryTab === "all" ? "" : normalizeText(activeCategoryTab);
 
-  useEffect(() => {
-    setVisibleCount(INITIAL_PAGE_SIZE);
-  }, [searchQuery, activeFeed, selectedCategory, selectedState, selectedArea, selectedViewCount]);
-
-  const baseFilteredStores = useMemo(() => {
-    const query = normalizeText(searchQuery);
-    const selectedCategoryKey = normalizeText(selectedCategory);
-    const selectedStateKey = selectedState === 'all' ? '' : normalizeText(selectedState);
-    const selectedAreaKey = selectedArea === 'all' ? '' : normalizeText(selectedArea);
-    const selectedViewCountValue = selectedViewCount === 'all' ? null : Number(selectedViewCount);
-
-    return allStores.filter((store) => {
-      const searchableFields = normalizeText([
-        store.storeName,
-        store.storeType,
-        store.address?.area,
-        store.address?.state,
-        store.address?.country,
-        store.description,
-        store.userId?.name,
-      ]
-        .filter(Boolean)
-        .join(' '));
-
-      if (query && !searchableFields.includes(query)) {
-        return false;
+    const locationKey = normalizeText(location);
+    let stores = allStores.filter((s) => {
+      const searchable = normalizeText(
+        [
+          s.storeName,
+          s.storeType,
+          s.address?.area,
+          s.address?.state,
+          s.description,
+          s.userId?.name,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+      if (q && !searchable.includes(q)) return false;
+      if (locationKey) {
+        const locationSearch = normalizeText(
+          [s.address?.area, s.address?.state, s.storeType]
+            .filter(Boolean)
+            .join(" "),
+        );
+        if (!locationSearch.includes(locationKey)) return false;
       }
-
-      if (selectedCategory !== 'all' && normalizeText(store.storeType) !== selectedCategoryKey) {
+      if (selectedCategory !== "all" && normalizeText(s.storeType) !== catKey)
         return false;
-      }
-
-      if (selectedState !== 'all' && normalizeText(canonicalizeState(store.address?.state)) !== selectedStateKey) {
+      if (
+        stateKey &&
+        normalizeText(canonicalizeState(s.address?.state)) !== stateKey
+      )
         return false;
-      }
-
-      if (selectedArea !== 'all' && normalizeText(store.address?.area) !== selectedAreaKey) {
-        return false;
-      }
-
-      if (selectedViewCountValue !== null && toNumber(store.viewCount) < selectedViewCountValue) {
-        return false;
-      }
-
+      if (areaKey && normalizeText(s.address?.area) !== areaKey) return false;
+      if (tabKey && normalizeText(s.storeType) !== tabKey) return false;
       return true;
     });
-  }, [allStores, searchQuery, selectedCategory, selectedState, selectedArea, selectedViewCount]);
-
-  const visibleStores = useMemo(() => {
-    const stores = [...baseFilteredStores];
 
     switch (activeFeed) {
-      case 'featured':
-        return stores.filter((store) => isFeaturedStore(store)).sort((left, right) => getStoreDiscoveryScore(right) - getStoreDiscoveryScore(left));
-      case 'newest':
-        return stores.sort((left, right) => toTimestamp(right.createdAt) - toTimestamp(left.createdAt));
-      case 'topViewed':
-        return stores.sort((left, right) => toNumber(right.viewCount) - toNumber(left.viewCount));
-      case 'popular':
-        return stores.sort((left, right) => getPopularityScore(right) - getPopularityScore(left));
-      case 'topRated':
+      case "featured":
         return stores
-          .filter((store) => getAverageRating(store) > 0)
-          .sort((left, right) => {
-            const ratingDiff = getAverageRating(right) - getAverageRating(left);
-            if (ratingDiff !== 0) {
-              return ratingDiff;
-            }
-
-            return getReviewCount(right) - getReviewCount(left);
-          });
-      case 'nearby':
-        if (!userLocation) {
-          return stores.sort((left, right) => getStoreDiscoveryScore(right) - getStoreDiscoveryScore(left));
-        }
-
-        return stores.sort((left, right) => {
-          const leftDistance = getDistanceKm(userLocation, left) ?? Number.POSITIVE_INFINITY;
-          const rightDistance = getDistanceKm(userLocation, right) ?? Number.POSITIVE_INFINITY;
-          return leftDistance - rightDistance;
-        });
-      case 'gst':
-        return stores.filter((store) => hasGst(store)).sort((left, right) => getStoreDiscoveryScore(right) - getStoreDiscoveryScore(left));
-      case 'random':
-        return sortRandomly(stores);
-      case 'all':
+          .filter((s) => s.isFeatured)
+          .sort((a, b) => discoveryScore(b) - discoveryScore(a));
+      case "topViewed":
+        return stores.sort((a, b) => toNum(b.viewCount) - toNum(a.viewCount));
+      case "topRated":
+        return stores
+          .filter((s) => avgRating(s) > 0)
+          .sort(
+            (a, b) =>
+              avgRating(b) - avgRating(a) || reviewCount(b) - reviewCount(a),
+          );
+      case "gst":
+        return stores
+          .filter(hasGst)
+          .sort((a, b) => discoveryScore(b) - discoveryScore(a));
+      case "random":
+        return [...stores].sort(() => Math.random() - 0.5);
       default:
-        return stores.sort((left, right) => getStoreDiscoveryScore(right) - getStoreDiscoveryScore(left));
+        return stores.sort((a, b) => discoveryScore(b) - discoveryScore(a));
     }
-  }, [baseFilteredStores, activeFeed, userLocation]);
+  }, [
+    allStores,
+    search,
+    activeFeed,
+    selectedCategory,
+    selectedState,
+    selectedArea,
+    activeCategoryTab,
+  ]);
 
-  const featuredCount = useMemo(() => allStores.filter((store) => isFeaturedStore(store)).length, [allStores]);
-  const verifiedCount = useMemo(() => allStores.filter((store) => store.isVerify).length, [allStores]);
-  const gstCount = useMemo(() => allStores.filter((store) => hasGst(store)).length, [allStores]);
-  const topRatedCount = useMemo(() => allStores.filter((store) => getAverageRating(store) >= 4).length, [allStores]);
-  const nearbyCount = useMemo(() => {
-    if (!userLocation) {
-      return 0;
-    }
+  const pagedStores = useMemo(
+    () => visibleStores.slice(0, visibleCount),
+    [visibleStores, visibleCount],
+  );
+  const canLoadMore = visibleStores.length > visibleCount;
+  const hasFilters = !!(
+    search.trim() ||
+    location.trim() ||
+    activeFeed !== "all" ||
+    selectedCategory !== "all" ||
+    selectedState !== "all" ||
+    selectedArea !== "all" ||
+    activeCategoryTab !== "all"
+  );
 
-    return allStores.filter((store) => {
-      const distance = getDistanceKm(userLocation, store);
-      return distance !== null && distance <= 50;
-    }).length;
-  }, [allStores, userLocation]);
-
-  const clearFilters = () => {
-    setSearchQuery('');
-    setActiveFeed('all');
-    setSelectedViewCount('all');
-    setSelectedCategory('all');
-    setSelectedState('all');
-    setSelectedArea('all');
+  const clearAll = () => {
+    setSearch("");
+    setLocation("");
+    setActiveFeed("all");
+    setSelectedCategory("all");
+    setSelectedState("all");
+    setSelectedArea("all");
+    setActiveCategoryTab("all");
   };
 
-  const activeFeedLabel = feedModes.find((feedMode) => feedMode.key === activeFeed)?.label || 'All Stores';
-  const hasAnyFilters =
-    searchQuery.trim().length > 0 ||
-    activeFeed !== 'all' ||
-    selectedViewCount !== 'all' ||
-    selectedCategory !== 'all' ||
-    selectedState !== 'all' ||
-    selectedArea !== 'all';
-  const locationReady = Boolean(userLocation);
-  const pagedStores = useMemo(() => visibleStores.slice(0, visibleCount), [visibleStores, visibleCount]);
-  const canLoadMore = visibleStores.length > visibleCount;
-
-  if (loading) {
-    return <VortexLoader />;
-  }
+  if (loading) return <VortexLoader />;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.15),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(244,114,182,0.12),_transparent_28%),linear-gradient(180deg,_#fffdf7_0%,_#ffffff_38%,_#fff7ed_100%)] text-slate-900">
+    <div className="min-h-screen bg-white text-slate-900">
       <Header />
 
-      {!locationReady && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-[2rem] border border-white/80 bg-white p-6 text-center shadow-[0_28px_80px_rgba(15,23,42,0.28)] sm:p-8">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-600">
-              <i className="pi pi-map-marker text-2xl" />
-            </div>
-            <h2 className="mt-4 text-3xl font-black text-slate-950">Location is required</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-600">
-              Please allow location access to continue. The store list, filters, and nearby sorting will unlock after permission is granted.
-            </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Button
-                label={locationLoading ? 'Requesting...' : 'Allow location'}
-                icon="pi pi-map-marker"
-                onClick={requestLocation}
-                disabled={locationLoading}
-                className="border-none bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-3 text-sm font-semibold text-white"
+      {/* ════════════════════════════════════════
+          SECTION 1 — Search Bar  (JD style)
+      ════════════════════════════════════════ */}
+      <section className="border-b border-slate-200 bg-white px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          {/* Headline */}
+          <h1 className="mb-4 text-2xl font-black text-slate-900 sm:text-3xl">
+            Search across{" "}
+            <span className="text-blue-600">
+              &apos;{allStores.length.toLocaleString()}+&apos;
+            </span>{" "}
+            <span className="text-orange-500">Businesses</span>
+          </h1>
+
+          {/* Search row */}
+          <div className="grid gap-3 sm:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-sm">
+              <i className="pi pi-map-marker text-slate-500" />
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Mumbai"
+                className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
-              {locationError && (
-                <Button
-                  label="Try again"
-                  icon="pi pi-refresh"
-                  onClick={requestLocation}
-                  className="border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
-                />
+            </div>
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-sm">
+              <i className="pi pi-search text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search for Spa & Salons"
+                className="flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Clear search"
+                >
+                  <i className="pi pi-times text-sm" />
+                </button>
               )}
-            </div>
-            {locationError && <p className="mt-4 text-sm font-medium text-rose-600">{locationError}</p>}
-          </div>
-        </div>
-      )}
-
-      <section className="relative overflow-hidden px-4 pb-12 pt-10 sm:px-6 sm:pb-16 sm:pt-16 lg:px-8 lg:pb-20 lg:pt-20">
-        <div className="absolute inset-0 -z-10 opacity-80">
-          <div className="absolute left-[-5rem] top-10 h-64 w-64 rounded-full bg-amber-300/25 blur-3xl" />
-          <div className="absolute right-[-4rem] top-28 h-72 w-72 rounded-full bg-rose-300/20 blur-3xl" />
-          <div className="absolute bottom-0 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-white/70 blur-3xl" />
-        </div>
-
-        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-          <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-amber-700 shadow-sm backdrop-blur">
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
-              Store discovery hub
-            </div>
-
-            <div className="space-y-4">
-              <h1 className="max-w-2xl text-4xl font-black leading-tight tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-                Find featured, nearby, verified, and trending stores in one beautiful list.
-              </h1>
-              <p className="max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
-                Browse every public store with fast filtering for promotion, newest openings, popularity, top ratings,
-                location, store type, featured stores, area-wise discovery, and GST verification.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="#store-browser"
-                className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5"
-              >
-                Explore stores
-              </Link>
-              <Link
-                href="/register"
-                className="inline-flex items-center justify-center rounded-full border border-amber-200 bg-white/85 px-5 py-3 text-sm font-semibold text-amber-700 shadow-sm transition-transform hover:-translate-y-0.5"
-              >
-                Register store
-              </Link>
               <button
                 type="button"
-                onClick={requestLocation}
-                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white/85 px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-transform hover:-translate-y-0.5"
+                className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Voice search"
               >
-                {locationLoading ? 'Detecting location...' : 'Use my location'}
+                <i className="pi pi-microphone text-sm" />
               </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                { label: 'Stores', value: allStores.length, tone: 'from-amber-500 to-orange-500' },
-                { label: 'Featured', value: featuredCount, tone: 'from-emerald-500 to-teal-500' },
-                { label: 'Verified', value: verifiedCount, tone: 'from-rose-500 to-orange-500' },
-                { label: 'GST verified', value: gstCount, tone: 'from-sky-500 to-cyan-500' },
-              ].map((stat) => (
-                <div key={stat.label} className="rounded-[1.5rem] border border-white/70 bg-white/90 p-4 shadow-lg backdrop-blur-sm">
-                  <div className={`inline-flex rounded-full bg-gradient-to-r ${stat.tone} px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white`}>
-                    {stat.label}
-                  </div>
-                  <p className="mt-3 text-3xl font-black text-slate-950">{stat.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 rounded-[2rem] bg-gradient-to-br from-amber-400/20 via-white/50 to-rose-400/20 blur-2xl" />
-            <div className="relative overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 p-4 shadow-[0_24px_80px_rgba(15,23,42,0.16)] backdrop-blur-xl sm:p-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[1.5rem] bg-slate-950 p-5 text-white shadow-xl">
-                  <p className="text-xs uppercase tracking-[0.3em] text-white/60">Current view</p>
-                  <h2 className="mt-3 text-2xl font-black">{activeFeedLabel}</h2>
-                  <p className="mt-2 text-sm leading-6 text-white/75">
-                    {hasAnyFilters
-                      ? 'Filters are shaping the list in real time.'
-                      : 'The default feed puts strong stores first while keeping every store visible.'}
-                  </p>
-                </div>
-
-                <div className="overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-amber-500 to-orange-500 p-5 text-white shadow-xl">
-                  <p className="text-xs uppercase tracking-[0.3em] text-white/70">Nearby</p>
-                  <h3 className="mt-3 text-2xl font-black">{userLocation ? `${nearbyCount} close matches` : 'Enable location'}</h3>
-                  <p className="mt-2 text-sm leading-6 text-white/85">
-                    {userLocation
-                      ? 'Nearby sort is based on your browser location and store coordinates.'
-                      : 'Click Use my location to sort stores around you.'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Location status</p>
-                <p className="mt-2 text-sm font-medium text-slate-700">
-                  {locationError
-                    ? locationError
-                    : userLocation
-                      ? 'Location enabled. Nearby filters are active.'
-                      : 'Nearby mode is ready once you allow location access.'}
-                </p>
-              </div>
+              <button
+                type="button"
+                className="rounded-2xl bg-[#e04c39] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#c94030]"
+              >
+                <i className="pi pi-search" />
+              </button>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="store-browser" className="px-4 pb-12 sm:px-6 lg:px-8 lg:pb-16">
-        <div className="mx-auto max-w-7xl space-y-6">
-          <div className="rounded-[2rem] border border-white/70 bg-white/90 p-4 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-5">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-amber-700">
-                  Store filters
-                </div>
-                <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Choose what you want to browse</h2>
-                <p className="text-sm leading-6 text-slate-600">
-                  Keep the filter bar on top and change it any time while scrolling the store list.
-                </p>
-              </div>
+      {/* ════════════════════════════════════════
+          SECTION 2 — Hero Slider + Service Cards
+      ════════════════════════════════════════ */}
+      <section className="border-b border-slate-100 bg-white px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <HeroBanner />
+        </div>
+      </section>
 
-              <button
-                type="button"
-                onClick={() => setIsFiltersOpen((current) => !current)}
-                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm lg:hidden"
-              >
-                <i className={`pi ${isFiltersOpen ? 'pi-chevron-up' : 'pi-sliders-h'} mr-2`} />
-                {isFiltersOpen ? 'Hide filters' : 'Show filters'}
-              </button>
+      {/* ════════════════════════════════════════
+          SECTION 3 — Category Icons (JD tiles)
+      ════════════════════════════════════════ */}
+      <section className="border-b border-slate-200 bg-white px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <CategoryGrid
+            activeTab={activeCategoryTab}
+            onTabChange={setActiveCategoryTab}
+          />
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════
+          SECTION 4 — Filters + Store Grid
+      ════════════════════════════════════════ */}
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          {/* ── Sidebar ── */}
+          <aside className="w-full shrink-0 space-y-4 lg:sticky lg:top-4 lg:w-56">
+            {/* Browse by */}
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-4 py-3">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                  Browse by
+                </h3>
+              </div>
+              <div className="p-2">
+                {FEED_MODES.map((mode) => (
+                  <button
+                    key={mode.key}
+                    onClick={() => setActiveFeed(mode.key)}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition ${
+                      activeFeed === mode.key
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <i
+                      className={`pi ${mode.icon} text-sm ${activeFeed === mode.key ? "text-blue-600" : "text-slate-400"}`}
+                    />
+                    {mode.label}
+                    {activeFeed === mode.key && (
+                      <i className="pi pi-check ml-auto text-xs text-blue-600" />
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className={`${isFiltersOpen ? 'mt-5 block' : 'mt-5 hidden'} space-y-4 lg:block`}>
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_auto_auto]">
-                <IconField iconPosition="left" className="w-full min-w-0">
-                  <InputIcon className="pi pi-search text-slate-400" />
-                  <InputText
-                    type="text"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search stores"
-                    className="w-full rounded-2xl border border-amber-200 bg-white py-3 pl-11 pr-4 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
-                  />
-                </IconField>
+            {hasFilters && (
+              <button
+                onClick={clearAll}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                <i className="pi pi-filter-slash" /> Clear all filters
+              </button>
+            )}
+          </aside>
 
-                <label className="space-y-2">
-                  <span className="sr-only">View count filter</span>
-                  <select
-                    value={selectedViewCount}
-                    onChange={(event) => setSelectedViewCount(event.target.value as ViewCountFilter)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
-                  >
-                    {viewCountFilters.map((filter) => (
-                      <option key={filter.key} value={filter.key} title={filter.description}>
-                        {filter.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <button
-                  type="button"
-                  onClick={requestLocation}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-amber-200 hover:text-amber-700"
-                >
-                  <i className="pi pi-map-marker" />
-                  {locationLoading ? 'Locating...' : userLocation ? 'Update location' : 'Use location'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
-                >
-                  <i className="pi pi-filter-slash" />
-                  Clear
-                </button>
+          {/* ── Store Grid ── */}
+          <div className="min-w-0 flex-1 space-y-5">
+            {/* Results header */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">
+                  {FEED_MODES.find((m) => m.key === activeFeed)?.label ||
+                    "All Stores"}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {visibleStores.length} stores found
+                  {search.trim() ? ` for "${search}"` : ""}
+                </p>
               </div>
-
-              <div className="overflow-x-auto pb-1">
-                <div className="flex min-w-max gap-3">
-                  {feedModes.map((feedMode) => {
-                    const active = activeFeed === feedMode.key;
-
-                    return (
-                      <button
-                        key={feedMode.key}
-                        type="button"
-                        onClick={() => setActiveFeed(feedMode.key)}
-                        className={`group flex min-w-[11rem] flex-col gap-1 rounded-[1.2rem] border px-4 py-3 text-left transition ${active
-                            ? 'border-amber-400 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg'
-                            : 'border-slate-200 bg-white text-slate-700 hover:border-amber-200 hover:shadow-md'
-                          }`}
-                      >
-                        <span className="flex items-center gap-2 text-sm font-bold">
-                          <i className={`pi ${feedMode.icon} ${active ? 'text-white' : 'text-amber-500'}`} />
-                          {feedMode.label}
-                        </span>
-                        <span className={`text-[11px] font-medium ${active ? 'text-white/80' : 'text-slate-500'}`}>
-                          {feedMode.description}
-                        </span>
+              {hasFilters && (
+                <div className="flex flex-wrap gap-2">
+                  {search.trim() && (
+                    <span className="flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                      &quot;{search}&quot;
+                      <button onClick={() => setSearch("")}>
+                        <i className="pi pi-times text-[10px]" />
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="grid gap-3 lg:grid-cols-3">
-                <label className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Category</span>
-                  <select
-                    value={selectedCategory}
-                    onChange={(event) => setSelectedCategory(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
-                  >
-                    <option value="all">All categories</option>
-                    {uniqueCategories.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">State</span>
-                  <select
-                    value={selectedState}
-                    onChange={(event) => setSelectedState(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
-                  >
-                    <option value="all">All states</option>
-                    {uniqueStates.map((state) => (
-                      <option key={state} value={state}>
-                        {state}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Area</span>
-                  <select
-                    value={selectedArea}
-                    onChange={(event) => setSelectedArea(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
-                  >
-                    <option value="all">All areas</option>
-                    {uniqueAreas.map((area) => (
-                      <option key={area} value={area}>
-                        {area}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              {hasAnyFilters && (
-                <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
-                  {searchQuery.trim() && <span className="rounded-full bg-white px-3 py-1 shadow-sm">Search</span>}
-                  {activeFeed !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">{activeFeedLabel}</span>}
-                  {selectedViewCount !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">{selectedViewCount}+ views</span>}
-                  {selectedCategory !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">{selectedCategory}</span>}
-                  {selectedState !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">{selectedState}</span>}
-                  {selectedArea !== 'all' && <span className="rounded-full bg-white px-3 py-1 shadow-sm">{selectedArea}</span>}
+                    </span>
+                  )}
+                  {selectedCategory !== "all" && (
+                    <span className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                      {selectedCategory}
+                      <button onClick={() => setSelectedCategory("all")}>
+                        <i className="pi pi-times text-[10px]" />
+                      </button>
+                    </span>
+                  )}
+                  {selectedState !== "all" && (
+                    <span className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                      {selectedState}
+                      <button onClick={() => setSelectedState("all")}>
+                        <i className="pi pi-times text-[10px]" />
+                      </button>
+                    </span>
+                  )}
                 </div>
               )}
             </div>
-          </div>
 
-          <div className="flex flex-col gap-3 rounded-[2rem] border border-white/70 bg-white/85 p-4 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:flex-row sm:items-end sm:justify-between sm:p-6">
-            <div className="max-w-3xl space-y-2">
-              <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-amber-700">
-                Store results
+            {error ? (
+              <div className="rounded-2xl border border-rose-100 bg-rose-50 p-8 text-center">
+                <i className="pi pi-exclamation-triangle mb-3 text-3xl text-rose-500" />
+                <p className="font-bold text-slate-900">
+                  Could not load stores
+                </p>
+                <p className="mt-1 text-sm text-slate-600">{error}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-4 rounded-full bg-rose-600 px-5 py-2 text-sm font-bold text-white"
+                >
+                  Try again
+                </button>
               </div>
-              <h2 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-                Results update instantly as you change the top filters.
-              </h2>
-              <p className="text-sm leading-7 text-slate-600 sm:text-base">
-                {activeFeed !== 'all' || selectedViewCount !== 'all' || selectedCategory !== 'all' || selectedState !== 'all' || selectedArea !== 'all' || searchQuery.trim()
-                  ? 'Use the sticky filter bar above to refine the list.'
-                  : 'Browse featured, nearby, verified, and trending stores from here.'}
-              </p>
-            </div>
-
-            <div className="min-w-[16rem] rounded-[1.5rem] border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-              Showing <span className="text-slate-950">{Math.min(visibleCount, visibleStores.length)}</span> of{' '}
-              <span className="text-slate-950">{visibleStores.length}</span> stores
-            </div>
-          </div>
-
-          <div>
-            {loading ? (
-              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                {Array.from({ length: 8 }).map((_, index) => (
-                  <div key={index} className="overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm">
-                    <div className="h-52 animate-pulse bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100" />
-                    <div className="space-y-3 p-5">
-                      <div className="h-5 w-3/4 animate-pulse rounded-full bg-slate-100" />
-                      <div className="h-4 w-1/2 animate-pulse rounded-full bg-slate-100" />
-                      <div className="h-20 animate-pulse rounded-2xl bg-slate-100" />
-                    </div>
-                  </div>
+            ) : loading ? (
+              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <SkeletonCard key={i} />
                 ))}
               </div>
-            ) : error ? (
-              <div className="mx-auto max-w-2xl rounded-[1.75rem] border border-rose-100 bg-rose-50 p-8 text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white text-rose-500 shadow-sm">
-                  <i className="pi pi-exclamation-triangle text-2xl" />
-                </div>
-                <h3 className="text-2xl font-black text-slate-950">Could not load stores</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{error}</p>
-                <Button
-                  label="Try again"
-                  icon="pi pi-refresh"
-                  onClick={() => window.location.reload()}
-                  className="mt-6 border-none bg-slate-950 px-5 py-3 text-sm font-semibold text-white"
-                />
-              </div>
             ) : visibleStores.length === 0 ? (
-              <div className="mx-auto max-w-2xl rounded-[1.75rem] border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-600">
-                  <i className="pi pi-search text-2xl" />
-                </div>
-                <h3 className="text-2xl font-black text-slate-950">No stores match this filter</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Try another category, clear the filters in the top bar, or switch to the all stores view.
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+                <div className="mx-auto mb-3 text-5xl">🔍</div>
+                <p className="font-bold text-slate-900">No stores found</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Try clearing filters or changing the category.
                 </p>
-                <Button
-                  label="Reset filters"
-                  icon="pi pi-filter-slash"
-                  onClick={clearFilters}
-                  className="mt-6 border-none bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-3 text-sm font-semibold text-white"
-                />
+                <button
+                  onClick={clearAll}
+                  className="mt-4 rounded-full bg-blue-600 px-5 py-2 text-sm font-bold text-white"
+                >
+                  Reset filters
+                </button>
               </div>
             ) : (
-              <div className="space-y-10">
-                <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              <>
+                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                   {pagedStores.map((store) => (
-                    <StoreCard key={store._id} store={store} userLocation={userLocation} />
+                    <StoreCard key={store._id} store={store} />
                   ))}
                 </div>
-
                 {canLoadMore && (
-                  <div className="flex justify-center">
-                    <Button
-                      label={`Load more (${Math.min(LOAD_MORE_STEP, visibleStores.length - visibleCount)} more)`}
-                      icon="pi pi-plus"
-                      onClick={() => setVisibleCount((current) => Math.min(current + LOAD_MORE_STEP, visibleStores.length))}
-                      className="border-none bg-slate-950 px-7 py-3 text-sm font-semibold text-white shadow-lg hover:bg-slate-900"
-                    />
+                  <div className="flex justify-center pt-2">
+                    <button
+                      onClick={() =>
+                        setVisibleCount((c) =>
+                          Math.min(c + LOAD_STEP, visibleStores.length),
+                        )
+                      }
+                      className="rounded-full border border-slate-300 bg-white px-8 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                    >
+                      Load more (
+                      {Math.min(LOAD_STEP, visibleStores.length - visibleCount)}{" "}
+                      stores)
+                    </button>
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         </div>
-      </section>
-
-      <section className="px-4 pb-16 sm:px-6 lg:px-8 lg:pb-20">
-        <div className="mx-auto max-w-7xl rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-600">Why this works</p>
-              <h3 className="mt-2 text-3xl font-black text-slate-950">Every store stays visible, but the most relevant ones rise first.</h3>
-              <p className="mt-3 text-sm leading-7 text-slate-600">
-                Featured stores are highlighted, newest stores are easy to find, popular and top-rated stores are ordered by
-                engagement and feedback, nearby stores can use your location, and state / area filtering keeps the list
-                practical for browsing.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[32rem]">
-              {[
-                { label: 'Top rated', value: topRatedCount, tone: 'from-violet-500 to-fuchsia-500' },
-                { label: 'Nearby ready', value: userLocation ? nearbyCount : 0, tone: 'from-sky-500 to-cyan-500' },
-                { label: 'Categories', value: uniqueCategories.length, tone: 'from-emerald-500 to-teal-500' },
-                { label: 'States', value: uniqueStates.length, tone: 'from-amber-500 to-orange-500' },
-              ].map((stat) => (
-                <div key={stat.label} className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4 shadow-sm">
-                  <div className={`inline-flex rounded-full bg-gradient-to-r ${stat.tone} px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white`}>
-                    {stat.label}
-                  </div>
-                  <p className="mt-3 text-2xl font-black text-slate-950">{stat.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+      </div>
 
       <Footer />
     </div>
