@@ -11,6 +11,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import axiosInstance from "@/service/axios.service";
 import VortexLoader from "@/app/(web)/components/VortexLoader";
+import { ChevronLeft, ChevronRight, Grid3X3 } from "lucide-react";
 
 const Header = dynamic(() => import("../components/Header"), { ssr: false });
 const Footer = dynamic(() => import("../components/Footer"), { ssr: false });
@@ -111,39 +112,25 @@ const CATEGORY_ICONS = [
 const HERO_SLIDES = [
   {
     id: 1,
-    image:
-      "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=900&h=460&fit=crop",
-    headline: "Time to fly at\nLowest Airfares",
-    cta: "Book Now",
-    brand: "Powered by EaseMyTrip",
-    overlayColor: "rgba(14,116,144,0.55)",
+    image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800&h=400&fit=crop",
+    overlayColor: "linear-gradient(90deg, rgba(245,230,200,0.92) 45%, rgba(245,230,200,0.3) 100%)",
+    headline: "Get Loan Against\nProperty",
+    subtext: "At a competitive interest rate starting from ",
+    highlight: "9.00%",
+    subtext2: " from AMP Credit",
+    cta: "Apply Now →",
+    brand: "AMP Finance",
   },
   {
     id: 2,
-    image:
-      "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=900&h=460&fit=crop",
-    headline: "Search, compare\n& book hotels",
-    cta: "Get Best Deals",
-    brand: "Powered by AMP Stays",
-    overlayColor: "rgba(92,45,145,0.55)",
-  },
-  {
-    id: 3,
-    image:
-      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=900&h=460&fit=crop",
-    headline: "Best Restaurants\nNear You",
-    cta: "Explore Now",
-    brand: "Powered by AMP Eats",
-    overlayColor: "rgba(15,118,110,0.55)",
-  },
-  {
-    id: 4,
-    image:
-      "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=900&h=460&fit=crop",
-    headline: "Shop Local\nBusiness Deals",
-    cta: "Browse Stores",
-    brand: "Powered by AMP Stores",
-    overlayColor: "rgba(180,83,9,0.55)",
+    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=400&fit=crop",
+    overlayColor: "linear-gradient(90deg, rgba(30,30,60,0.88) 45%, rgba(30,30,60,0.3) 100%)",
+    headline: "Find the Best\nDeals Near You",
+    subtext: "Discover top-rated stores and ",
+    highlight: "exclusive offers",
+    subtext2: " in your area",
+    cta: "Explore Now →",
+    brand: "AMP Shopping",
   },
 ];
 
@@ -152,33 +139,29 @@ const SERVICE_CARDS = [
     id: 1,
     label: "B2B",
     sub: "Quick Quotes",
-    bg: "#1a56db",
-    image:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop&crop=faces",
+    bg: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=230&fit=crop&crop=top",
   },
   {
     id: 2,
-    label: "Repairs & Services",
+    label: "REPAIRS & SERVICES",
     sub: "Get Nearest Vendor",
-    bg: "#7e3af2",
-    image:
-      "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&h=400&fit=crop",
+    bg: "linear-gradient(135deg, #7c3aed, #6d28d9)",
+    image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=200&h=230&fit=crop&crop=top",
   },
   {
     id: 3,
-    label: "Real Estate",
+    label: "REAL ESTATE",
     sub: "Finest Agents",
-    bg: "#1c64f2",
-    image:
-      "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=300&h=400&fit=crop",
+    bg: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+    image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=200&h=230&fit=crop&crop=top",
   },
   {
     id: 4,
-    label: "Doctors",
+    label: "DOCTORS",
     sub: "Book Now",
-    bg: "#057a55",
-    image:
-      "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=300&h=400&fit=crop&crop=faces",
+    bg: "linear-gradient(135deg, #059669, #047857)",
+    image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&h=230&fit=crop&crop=top",
   },
 ];
 
@@ -193,8 +176,7 @@ const FEED_MODES: Array<{ key: FeedMode; label: string; icon: string }> = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const fallbackImage =
-  "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&h=600&fit=crop";
+const fallbackImage = "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&h=400&fit=crop";
 const normalizeText = (v: unknown) =>
   String(v ?? "")
     .toLowerCase()
@@ -306,24 +288,14 @@ function HeroBanner() {
     };
   }, [startTimer]);
 
-  const go = (idx: number) => {
-    setCurrent(idx);
-    startTimer();
-  };
-  const prev = () => {
-    setCurrent((p) => (p - 1 + HERO_SLIDES.length) % HERO_SLIDES.length);
-    startTimer();
-  };
-  const next = () => {
-    setCurrent((p) => (p + 1) % HERO_SLIDES.length);
-    startTimer();
-  };
+  const go = (idx: number) => { setCurrent(idx); startTimer(); };
+  const prev = () => { setCurrent((p) => (p - 1 + HERO_SLIDES.length) % HERO_SLIDES.length); startTimer(); };
+  const next = () => { setCurrent((p) => (p + 1) % HERO_SLIDES.length); startTimer(); };
   const slide = HERO_SLIDES[current];
 
   return (
-    /* Outer wrapper — matches JD's banner section proportions */
     <div className="flex gap-3">
-      {/* ── LEFT: Wide Slider (roughly 57% width like JD) ── */}
+      {/* LEFT: Wide Slider */}
       <div
         className="relative flex-1 min-w-0 overflow-hidden rounded-2xl"
         style={{ height: 230 }}
@@ -332,73 +304,66 @@ function HeroBanner() {
           <div
             key={s.id}
             className="absolute inset-0 transition-opacity duration-700"
-            style={{
-              opacity: idx === current ? 1 : 0,
-              zIndex: idx === current ? 1 : 0,
-            }}
+            style={{ opacity: idx === current ? 1 : 0, zIndex: idx === current ? 1 : 0 }}
           >
             <img
               src={s.image}
               alt=""
-              className="h-full w-full object-cover"
-              onError={(e: any) => {
-                e.target.src = fallbackImage;
-              }}
+              className="absolute right-0 top-0 h-full w-auto object-cover object-top"
+              onError={(e: any) => { e.target.src = fallbackImage; }}
             />
-            {/* colour tint overlay */}
-            <div
-              className="absolute inset-0"
-              style={{ background: s.overlayColor }}
-            />
+            <div className="absolute inset-0" style={{ background: s.overlayColor }} />
           </div>
         ))}
 
-        {/* text */}
-        <div className="absolute inset-0 z-10 flex flex-col justify-end p-6">
-          <h2
-            className="text-2xl font-black leading-tight text-white drop-shadow sm:text-3xl"
-            style={{ whiteSpace: "pre-line" }}
-          >
+        {/* Text content */}
+        <div className="absolute inset-0 z-10 flex flex-col justify-center p-6 max-w-[55%]">
+          <h2 className="text-xl font-black leading-tight text-slate-900 sm:text-2xl"
+            style={{ whiteSpace: "pre-line" }}>
             {slide.headline}
           </h2>
-          <div className="mt-3 flex items-center gap-4">
-            <button className="rounded border-2 border-white px-5 py-1.5 text-sm font-bold text-white transition hover:bg-white hover:text-slate-900">
-              {slide.cta}
-            </button>
-            <span className="text-xs font-semibold text-white/70">
-              {slide.brand}
-            </span>
-          </div>
-          {/* dots */}
-          <div className="mt-4 flex gap-2">
-            {HERO_SLIDES.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => go(idx)}
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  idx === current ? "w-6 bg-white" : "w-2 bg-white/40"
-                }`}
-              />
-            ))}
-          </div>
+          <p className="mt-2 text-xs text-slate-600 leading-relaxed">
+            {slide.subtext}
+            <span className="font-black text-amber-600">{slide.highlight}</span>
+            {slide.subtext2}
+          </p>
+          <button className="mt-4 w-fit rounded-lg bg-amber-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-amber-700 shadow-md">
+            {slide.cta}
+          </button>
+          <p className="mt-2 text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
+            {slide.brand}
+          </p>
         </div>
 
-        {/* arrows */}
+        {/* Dots */}
+        <div className="absolute bottom-3 left-6 z-10 flex gap-1.5">
+          {HERO_SLIDES.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => go(idx)}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                idx === current ? "w-5 bg-amber-600" : "w-1.5 bg-slate-400/50"
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Arrows */}
         <button
           onClick={prev}
-          className="absolute left-2 top-1/2 z-20 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50"
+          className="absolute left-2 top-1/2 z-20 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 transition"
         >
           <i className="pi pi-chevron-left text-xs" />
         </button>
         <button
           onClick={next}
-          className="absolute right-2 top-1/2 z-20 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50"
+          className="absolute right-2 top-1/2 z-20 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 transition"
         >
           <i className="pi pi-chevron-right text-xs" />
         </button>
       </div>
 
-      {/* ── RIGHT: 4 Tall Service Cards (roughly 43% width, 2×2 grid) ── */}
+      {/* RIGHT: 4 Service Cards */}
       <div
         className="hidden sm:grid grid-cols-2 gap-2 shrink-0"
         style={{ width: "43%", height: 230 }}
@@ -409,26 +374,25 @@ function HeroBanner() {
             className="relative overflow-hidden rounded-xl cursor-pointer group"
             style={{ background: card.bg }}
           >
-            {/* person image — right-aligned, bottom-anchored like JD */}
             <img
               src={card.image}
               alt={card.label}
-              className="absolute bottom-0 right-0 h-full w-auto object-cover object-top opacity-75 group-hover:opacity-90 transition-opacity"
-              onError={(e: any) => {
-                e.target.style.display = "none";
-              }}
+              className="absolute bottom-0 right-0 h-full w-auto object-cover object-top opacity-70 group-hover:opacity-90 transition-opacity"
+              onError={(e: any) => { e.target.style.display = "none"; }}
             />
-            {/* text */}
+            {/* Dark gradient so text is readable */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
+
             <div className="relative z-10 p-3">
-              <p className="text-[11px] font-semibold text-white/75 leading-tight">
+              <p className="text-[10px] font-semibold text-white/75 leading-tight uppercase tracking-wide">
                 {card.sub}
               </p>
-              <h3 className="mt-0.5 text-[15px] font-black leading-tight text-white">
+              <h3 className="mt-0.5 text-sm font-black leading-tight text-white">
                 {card.label}
               </h3>
             </div>
-            {/* arrow badge — bottom left like JD */}
-            <div className="absolute bottom-3 left-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white group-hover:bg-white/35 transition">
+
+            <div className="absolute bottom-3 left-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-white group-hover:bg-white/40 transition">
               <i className="pi pi-chevron-right text-[10px]" />
             </div>
           </div>
@@ -447,63 +411,116 @@ function CategoryGrid({
   activeTab: string;
   onTabChange: (label: string) => void;
 }) {
-  return (
-    <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
-      {/* "All" tile */}
-      <button
-        onClick={() => onTabChange("all")}
-        className={`flex shrink-0 flex-col items-center gap-2 rounded-xl border px-3 py-3 transition hover:border-orange-400 hover:shadow-sm ${
-          activeTab === "all"
-            ? "border-orange-400 bg-orange-50"
-            : "border-slate-200 bg-white"
-        }`}
-        style={{ minWidth: 76 }}
-      >
+  const [showAll, setShowAll] = useState(false);
+  const sliderRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (direction: "left" | "right") => {
+    if (!sliderRef.current) return;
+
+    sliderRef.current.scrollBy({
+      left: direction === "left" ? -300 : 300,
+      behavior: "smooth",
+    });
+  };
+
+  const renderCategoryButton = (
+    label: string,
+    icon?: string,
+    isAll?: boolean,
+  ) => (
+    <button
+      key={label}
+      onClick={() =>
+        onTabChange(isAll ? "all" : activeTab === label ? "all" : label)
+      }
+      className={`flex shrink-0 flex-col items-center gap-2 rounded-xl border px-3 py-3 transition hover:border-orange-400 hover:shadow-sm ${
+        activeTab === label || (isAll && activeTab === "all")
+          ? "border-orange-400 bg-orange-50"
+          : "border-slate-200 bg-white"
+      }`}
+      style={{ minWidth: 90 }}
+    >
+      {isAll ? (
         <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-2xl">
           🏠
         </div>
-        <span className="text-center text-[11px] font-semibold leading-tight text-slate-700">
-          All
-        </span>
-      </button>
+      ) : (
+        <img
+          src={icon}
+          alt={label}
+          className="h-11 w-11 object-contain"
+          onError={(e: any) => {
+            e.target.style.display = "none";
+          }}
+        />
+      )}
 
-      {CATEGORY_ICONS.map((cat) => (
+      <span className="text-center text-[11px] font-semibold leading-tight text-slate-700">
+        {label}
+      </span>
+    </button>
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <button
-          key={cat.label}
-          onClick={() =>
-            onTabChange(activeTab === cat.label ? "all" : cat.label)
-          }
-          className={`flex shrink-0 flex-col items-center gap-2 rounded-xl border px-3 py-3 transition hover:border-orange-400 hover:shadow-sm ${
-            activeTab === cat.label
-              ? "border-orange-400 bg-orange-50"
-              : "border-slate-200 bg-white"
-          }`}
-          style={{ minWidth: 76 }}
+          onClick={() => setShowAll(!showAll)}
+          className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium hover:bg-slate-50"
         >
-          <img
-            src={cat.icon}
-            alt={cat.label}
-            className="h-11 w-11 object-contain"
-            onError={(e: any) => {
-              e.target.style.display = "none";
-            }}
-          />
-          <span className="text-center text-[11px] font-semibold leading-tight text-slate-700">
-            {cat.label}
-          </span>
+          <Grid3X3 size={14} />
+          {showAll ? "Slider View" : "Show All"}
         </button>
-      ))}
+      </div>
+
+      {/* Grid View */}
+      {showAll ? (
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+          {renderCategoryButton("all", undefined, true)}
+
+          {CATEGORY_ICONS.map((cat) =>
+            renderCategoryButton(cat.label, cat.icon),
+          )}
+        </div>
+      ) : (
+        <div className="relative">
+          {/* Left Arrow */}
+          <button
+            onClick={() => scroll("left")}
+            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white p-2 shadow-md border border-slate-200"
+          >
+            <ChevronLeft size={18} />
+          </button>
+
+          {/* Slider */}
+          <div
+            ref={sliderRef}
+            className="flex gap-3 overflow-x-hidden scroll-smooth px-10"
+          >
+            {renderCategoryButton("all", undefined, true)}
+
+            {CATEGORY_ICONS.map((cat) =>
+              renderCategoryButton(cat.label, cat.icon),
+            )}
+          </div>
+
+          {/* Right Arrow */}
+          <button
+            onClick={() => scroll("right")}
+            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white p-2 shadow-md border border-slate-200"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── StoreCard ────────────────────────────────────────────────────────────────
 
-function StoreCard({
-  store,
-}: {
-  store: Store;
-}) {
+function StoreCard({ store }: { store: Store }) {
   const rating = avgRating(store);
   const reviews = reviewCount(store);
   const views = toNum(store.viewCount);
@@ -567,7 +584,7 @@ function StoreCard({
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-4">
-                <div>
+        <div>
           <h4 className="line-clamp-1 text-[1.05rem] font-bold leading-snug text-slate-900">
             {store.storeName}
           </h4>
@@ -813,64 +830,14 @@ export default function Home() {
       <Header />
 
       {/* ════════════════════════════════════════
-          SECTION 1 — Search Bar  (JD style)
+          SECTION 3 — Category Icons (JD tiles)
       ════════════════════════════════════════ */}
       <section className="border-b border-slate-200 bg-white px-4 py-5 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          {/* Headline */}
-          <h1 className="mb-4 text-2xl font-black text-slate-900 sm:text-3xl">
-            Search across{" "}
-            <span className="text-blue-600">
-              &apos;{allStores.length.toLocaleString()}+&apos;
-            </span>{" "}
-            <span className="text-orange-500">Businesses</span>
-          </h1>
-
-          {/* Search row */}
-          <div className="grid gap-3 sm:grid-cols-[220px_minmax(0,1fr)]">
-            <div className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-sm">
-              <i className="pi pi-map-marker text-slate-500" />
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Mumbai"
-                className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-              />
-            </div>
-            <div className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-sm">
-              <i className="pi pi-search text-slate-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search for Spa & Salons"
-                className="flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                  aria-label="Clear search"
-                >
-                  <i className="pi pi-times text-sm" />
-                </button>
-              )}
-              <button
-                type="button"
-                className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                aria-label="Voice search"
-              >
-                <i className="pi pi-microphone text-sm" />
-              </button>
-              <button
-                type="button"
-                className="rounded-2xl bg-[#e04c39] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#c94030]"
-              >
-                <i className="pi pi-search" />
-              </button>
-            </div>
-          </div>
+          <CategoryGrid
+            activeTab={activeCategoryTab}
+            onTabChange={setActiveCategoryTab}
+          />
         </div>
       </section>
 
@@ -880,18 +847,6 @@ export default function Home() {
       <section className="border-b border-slate-100 bg-white px-4 py-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <HeroBanner />
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════
-          SECTION 3 — Category Icons (JD tiles)
-      ════════════════════════════════════════ */}
-      <section className="border-b border-slate-200 bg-white px-4 py-5 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <CategoryGrid
-            activeTab={activeCategoryTab}
-            onTabChange={setActiveCategoryTab}
-          />
         </div>
       </section>
 

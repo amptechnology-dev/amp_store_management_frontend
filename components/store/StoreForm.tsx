@@ -488,58 +488,106 @@ function StoreForm({
   };
 
   const applyLocationResult = (result: LocationSearchResult) => {
-    const latitude = Number(result.lat);
-    const longitude = Number(result.lon);
-    const address = result.address || {};
-    const detailedLocation = formatDetailedLocation(address, result.display_name);
+  const latitude = Number(result.lat);
+  const longitude = Number(result.lon);
+  const address = result.address || {};
 
-    setValue("lat", latitude, { shouldDirty: true, shouldValidate: true });
-    setValue("long", longitude, { shouldDirty: true, shouldValidate: true });
-    setValue("area", detailedLocation, { shouldDirty: true, shouldValidate: true });
-    setValue("state", address.state || selectedState, { shouldDirty: true, shouldValidate: true });
-    setValue("country", address.country || selectedCountry || "India", { shouldDirty: true, shouldValidate: true });
+  // Area field এ clean, short address রাখো
+  const road = [address.house_number, address.road].filter(Boolean).join(" ");
+  const locality =
+    address.suburb ||
+    address.neighbourhood ||
+    address.city_district ||
+    address.city ||
+    address.town ||
+    address.village ||
+    "";
+  const pincode = address.postcode || "";
 
-    setLocationQuery(detailedLocation);
-    setSelectedLocationLabel(detailedLocation);
-    setLocationResults([]);
-  };
+  const areaValue = [road, locality, pincode].filter(Boolean).join(", ") || result.display_name;
+
+  const stateName =
+    address.state ||
+    address.state_district ||
+    selectedState ||
+    "";
+  const countryName = address.country || "India";
+
+  setValue("lat", latitude, { shouldDirty: true, shouldValidate: true });
+  setValue("long", longitude, { shouldDirty: true, shouldValidate: true });
+  setValue("area", areaValue, { shouldDirty: true, shouldValidate: true });
+
+  if (stateName) {
+    // INDIAN_STATES list এ exact match খোঁজো
+    const matchedState = INDIAN_STATES.find(
+      (s) => s.toLowerCase() === stateName.toLowerCase()
+    );
+    setValue("state", matchedState || stateName, { shouldDirty: true, shouldValidate: true });
+  }
+
+  setValue("country", countryName, { shouldDirty: true, shouldValidate: true });
+  setLocationQuery(areaValue);
+  setSelectedLocationLabel(areaValue);
+  setLocationResults([]);
+};
 
   const searchDetailedLocation = async () => {
-    const query = locationQuery.trim();
+  const query = locationQuery.trim();
 
-    if (!query) {
-      toast.error("Enter a street, landmark, or locality to search.");
+  if (!query) {
+    toast.error("Enter a street, landmark, or locality to search.");
+    return;
+  }
+
+  setIsSearchingLocation(true);
+  setLocationResults([]);
+
+  try {
+    // Strategy 1: Direct query with India restriction
+    let results: LocationSearchResult[] = [];
+
+    const attempt = async (q: string) => {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=8&countrycodes=in&q=${encodeURIComponent(q)}`,
+        { headers: { Accept: "application/json", "Accept-Language": "en" } }
+      );
+      if (!res.ok) throw new Error("Search failed");
+      return (await res.json()) as LocationSearchResult[];
+    };
+
+    // Attempt 1: exact query as typed
+    results = await attempt(query);
+
+    // Attempt 2: যদি result না আসে, শেষের comma-separated part গুলো দিয়ে retry
+    if (results.length === 0) {
+      const parts = query.split(",").map((p) => p.trim()).filter(Boolean);
+      // পিছন থেকে একটা করে কমাও — e.g. "33/A, Belghoria, Kolkata"
+      for (let i = 1; i < parts.length && results.length === 0; i++) {
+        const shorterQuery = parts.slice(i).join(", ");
+        results = await attempt(shorterQuery);
+      }
+    }
+
+    // Attempt 3: শুধু প্রথম দুটো part
+    if (results.length === 0) {
+      const parts = query.split(",").map((p) => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        results = await attempt(parts.slice(0, 2).join(", "));
+      }
+    }
+
+    if (results.length === 0) {
+      toast.info("No results found. Try shorter address like 'Belghoria, Kolkata'");
       return;
     }
 
-    const searchText = [query, selectedState, selectedCountry].filter(Boolean).join(", ");
-
-    setIsSearchingLocation(true);
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&q=${encodeURIComponent(searchText)}`,
-        { headers: { Accept: "application/json" } }
-      );
-
-      if (!response.ok) {
-        throw new Error("Unable to search for detailed locations");
-      }
-
-      const results = (await response.json()) as LocationSearchResult[];
-
-      if (!Array.isArray(results) || results.length === 0) {
-        setLocationResults([]);
-        toast.info("No detailed locations found. Try a nearby landmark or street name.");
-        return;
-      }
-
-      setLocationResults(results);
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to search detailed locations");
-    } finally {
-      setIsSearchingLocation(false);
-    }
-  };
+    setLocationResults(results);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to search locations");
+  } finally {
+    setIsSearchingLocation(false);
+  }
+};
 
   const setLocationFromMap = async (latitude: number, longitude: number) => {
     setValue("lat", latitude, { shouldDirty: true, shouldValidate: true });

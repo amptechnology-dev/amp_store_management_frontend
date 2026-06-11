@@ -582,7 +582,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
               Name : {product.name}
             </h4>
           </div>
-
           <div className="flex items-center justify-between">
             <div>
               <p className="text-lg font-black text-amber-600">
@@ -986,9 +985,22 @@ export default function StoreDetails() {
 
           {/* Right: Store Info — self-start so it doesn't create extra height */}
           <aside className="min-w-0 self-start rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm sm:p-5">
-            <h1 className="text-xl font-black text-slate-900 mb-2">
+            {/* Back Button */}
+            <Link
+              href="/store"
+              className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition hover:text-amber-600"
+            >
+              <i className="pi pi-arrow-left text-xs" />
+              Back to Stores
+            </Link>
+
+            <h1 className="text-xl font-black text-slate-900 mb-1">
               {store.storeName}
             </h1>
+
+            {store.storeType && (
+              <p className="text-xs text-slate-500 mb-2">{store.storeType}</p>
+            )}
 
             {/* Rating Summary */}
             <div className="mb-3 pb-3 border-b border-slate-200">
@@ -1003,39 +1015,6 @@ export default function StoreDetails() {
               <p className="text-xs text-slate-500">
                 Based on customer reviews
               </p>
-            </div>
-
-            {/* Contact Info */}
-            <div className="space-y-2 mb-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-0.5">
-                  Owner
-                </p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {store.userId.name}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-0.5">
-                  Contact
-                </p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {store.contactNo}
-                </p>
-              </div>
-              {store.email && (
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-0.5">
-                    Email
-                  </p>
-                  <a
-                    href={`mailto:${store.email}`}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700 underline break-all"
-                  >
-                    {store.email}
-                  </a>
-                </div>
-              )}
             </div>
 
             {/* Status Badge */}
@@ -1059,17 +1038,45 @@ export default function StoreDetails() {
               </p>
             </div>
 
-            {/* CTA Button */}
-            {store.website && (
-              <a
-                href={store.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2.5 text-center text-sm font-bold text-white shadow-md transition hover:from-amber-600 hover:to-orange-600 hover:shadow-lg"
-              >
-                Visit Website
-              </a>
-            )}
+            {/* Action Buttons — Google style */}
+            <div className="flex flex-wrap gap-2">
+              {store.website && (
+                <a
+                  href={store.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 min-w-[64px]"
+                >
+                  <i className="pi pi-globe text-blue-500 text-base" />
+                  Website
+                </a>
+              )}
+
+              {store.whatsappNo && (
+                <a
+                  href={buildWhatsAppShareUrl(
+                    store.whatsappNo,
+                    `Hi, I found your store *${store.storeName}* on AMP Shopping!`,
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 min-w-[64px]"
+                >
+                  <i className="pi pi-whatsapp text-emerald-500 text-base" />
+                  WhatsApp
+                </a>
+              )}
+
+              {store.contactNo && (
+                <a
+                  href={`tel:${store.contactNo}`}
+                  className="inline-flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 min-w-[64px]"
+                >
+                  <i className="pi pi-phone text-blue-500 text-base" />
+                  Call
+                </a>
+              )}
+            </div>
           </aside>
         </div>
 
@@ -1114,96 +1121,176 @@ export default function StoreDetails() {
             </div>
 
             {/* ADS SECTION */}
-            <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <i className="pi pi-megaphone text-amber-500" />
-                  Featured Ads
-                </h2>
-                <div className="flex gap-2">
+            <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100">
+                    <i className="pi pi-megaphone text-amber-500 text-sm" />
+                  </span>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Featured Ads
+                  </h2>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-600">
+                    SPONSORED
+                  </span>
+                </div>
+                <div className="flex gap-1.5">
                   <button
                     onClick={() =>
                       setAdIndex((prev) => (prev - 1 + ads.length) % ads.length)
                     }
-                    className="rounded-full bg-slate-100 p-2 text-slate-700 hover:bg-slate-200"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600"
                     aria-label="Prev ad"
                   >
-                    <i className="pi pi-chevron-left" />
+                    <i className="pi pi-chevron-left text-xs" />
                   </button>
                   <button
                     onClick={() =>
                       setAdIndex((prev) => (prev + 1) % ads.length)
                     }
-                    className="rounded-full bg-slate-100 p-2 text-slate-700 hover:bg-slate-200"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600"
                     aria-label="Next ad"
                   >
-                    <i className="pi pi-chevron-right" />
+                    <i className="pi pi-chevron-right text-xs" />
                   </button>
                 </div>
               </div>
+
+              {/* Slider */}
               <div className="relative overflow-hidden">
                 <div
-                  className="flex transition-transform duration-300"
+                  className="flex transition-transform duration-500 ease-in-out"
                   style={{ transform: `translateX(-${adIndex * 100}%)` }}
                 >
                   {ads.map((ad, i) => (
                     <div
                       key={i}
-                      className="w-full flex-shrink-0 rounded-xl bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 p-6 border border-amber-100 text-center"
+                      className="w-full flex-shrink-0 relative bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 p-6 min-h-[120px] flex flex-col items-center justify-center text-center"
                     >
-                      <div className="text-2xl font-black text-amber-600 mb-2">
+                      {/* Background pattern */}
+                      <div
+                        className="absolute inset-0 opacity-10"
+                        style={{
+                          backgroundImage: `radial-gradient(circle at 20% 50%, white 1px, transparent 1px),
+                radial-gradient(circle at 80% 20%, white 1px, transparent 1px)`,
+                          backgroundSize: "30px 30px",
+                        }}
+                      />
+                      <p className="relative text-xs font-bold uppercase tracking-widest text-white/70 mb-1">
+                        Advertisement
+                      </p>
+                      <h3 className="relative text-xl font-black text-white mb-1">
                         {ad}
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        Promotional content
+                      </h3>
+                      <p className="relative text-xs text-white/80">
+                        Tap to learn more about this offer
                       </p>
                     </div>
                   ))}
                 </div>
               </div>
+
+              {/* Dot indicators */}
+              <div className="flex items-center justify-center gap-1.5 py-3">
+                {ads.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setAdIndex(i)}
+                    className={`rounded-full transition-all duration-300 ${
+                      i === adIndex
+                        ? "w-4 h-1.5 bg-amber-500"
+                        : "w-1.5 h-1.5 bg-slate-200 hover:bg-slate-300"
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Right Section - Reviews */}
+          {/* Right Section - Reviews */}
           <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm border border-slate-100 lg:sticky lg:top-24 h-fit">
-            <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <i className="pi pi-comments text-amber-500" />
-                Reviews
-              </h2>
-              <span className="text-sm font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
-                {reviews.length}
-              </span>
+            {/* Average Rating Summary */}
+            <div className="flex items-center gap-3 mb-3">
+              <div className="text-4xl font-black text-slate-900">
+                {averageRating.toFixed(1)}
+              </div>
+              <div>
+                <div className="flex gap-0.5 mb-0.5">
+                  {renderRatingStars(averageRating, "text-sm")}
+                </div>
+                <p className="text-xs text-slate-500">
+                  {reviews.length} reviews
+                </p>
+              </div>
             </div>
 
+            {/* Write a Review Button */}
+            {authUser && (
+              <button
+                onClick={() => {
+                  const el = document.getElementById("review-form");
+                  el?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-2 text-sm font-semibold text-slate-700 transition hover:border-amber-400 hover:bg-amber-50 hover:text-amber-700"
+              >
+                <i className="pi pi-pencil text-amber-500" />
+                Write a review
+              </button>
+            )}
+
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+              Reviews aren't verified
+            </p>
+
+            {/* Review List */}
             {reviews.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <i className="pi pi-star text-4xl text-slate-200 mb-2" />
-                <p className="text-sm text-slate-400 text-center">
-                  No reviews yet. Be the first to review!
+              <div className="flex flex-col items-center justify-center py-6">
+                <i className="pi pi-star text-3xl text-slate-200 mb-2" />
+                <p className="text-xs text-slate-400 text-center">
+                  No reviews yet. Be the first!
                 </p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
                 {reviews.map((review) => (
                   <div
                     key={review._id}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-4 hover:border-amber-200 hover:bg-amber-50 transition"
+                    className="flex items-start gap-2.5 py-2 border-b border-slate-100 last:border-0"
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <p className="text-sm font-bold text-slate-900">
-                        {review.userId.name}
-                      </p>
-                      <div className="flex gap-0.5">
-                        {renderRatingStars(review.rating, "text-xs")}
-                      </div>
+                    {/* Avatar */}
+                    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full">
+                      {review.userId.picture ? (
+                        <img
+                          src={review.userId.picture}
+                          alt={review.userId.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-xs font-bold text-white">
+                          {review.userId.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                     </div>
-                    <p className="text-xs text-slate-500 mb-2">
-                      {formatReviewDate(review.createdAt)}
-                    </p>
-                    <p className="text-sm text-slate-700 leading-relaxed">
-                      {review.comment}
-                    </p>
+
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {review.userId.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 shrink-0">
+                          {formatReviewDate(review.createdAt)}
+                        </p>
+                      </div>
+                      <div className="flex gap-0.5 mb-1">
+                        {renderRatingStars(review.rating, "text-[10px]")}
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
+                        {review.comment}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1211,16 +1298,19 @@ export default function StoreDetails() {
 
             {/* Add Review Form */}
             {authUser && (
-              <div className="mt-6 pt-6 border-t border-slate-200">
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
+              <div
+                id="review-form"
+                className="mt-4 pt-4 border-t border-slate-200"
+              >
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
                   Share your feedback
                 </p>
-                <div className="mb-3 flex gap-2">
+                <div className="mb-2 flex gap-1.5">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
                       onClick={() => setReviewRating(star)}
-                      className="text-lg transition"
+                      className="text-base transition"
                     >
                       <i
                         className={`pi pi-star-fill ${
@@ -1236,23 +1326,23 @@ export default function StoreDetails() {
                   value={reviewComment}
                   onChange={(e) => setReviewComment(e.target.value)}
                   placeholder="Share your experience..."
-                  className="w-full rounded-lg border border-slate-300 p-3 text-sm resize-none focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs resize-none focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-yellow-100"
                   rows={3}
                 />
                 {reviewSubmitError && (
-                  <p className="mt-2 text-xs text-red-600 font-semibold">
+                  <p className="mt-1.5 text-xs text-red-600 font-semibold">
                     {reviewSubmitError}
                   </p>
                 )}
                 {reviewSubmitSuccess && (
-                  <p className="mt-2 text-xs text-emerald-600 font-semibold">
+                  <p className="mt-1.5 text-xs text-emerald-600 font-semibold">
                     {reviewSubmitSuccess}
                   </p>
                 )}
                 <button
                   onClick={handleSubmitReview}
                   disabled={reviewSubmitting}
-                  className="mt-3 w-full rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 py-2.5 font-bold text-white shadow-md transition hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="mt-2 w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2 text-sm font-bold text-white shadow-sm transition hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {reviewSubmitting && (
                     <i className="pi pi-spin pi-spinner text-sm" />
