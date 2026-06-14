@@ -23,10 +23,38 @@ interface StoreReview {
   comment?: string;
 }
 
+interface ApiSubCategory {
+  _id: string;
+  name: string;
+  image?: string;
+  isActive?: boolean;
+}
+
+interface ApiCategory {
+  _id: string;
+  name: string;
+  image?: string;
+  description?: string;
+  subCategories: ApiSubCategory[];
+  isActive?: boolean;
+}
+
+interface Ad {
+  _id: string;
+  title: string;
+  description?: string;
+  image?: string;
+  redirectUrl?: string;
+  rank?: number;
+  isActive?: boolean;
+}
+
 interface Store {
   _id: string;
   storeName: string;
   storeType: string;
+  categoryId?: string;
+  subCategoryId?: string;
   isFeatured?: boolean;
   viewCount?: number;
   userId: { _id: string; name: string; email: string; phone: string };
@@ -112,8 +140,10 @@ const CATEGORY_ICONS = [
 const HERO_SLIDES = [
   {
     id: 1,
-    image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800&h=400&fit=crop",
-    overlayColor: "linear-gradient(90deg, rgba(245,230,200,0.92) 45%, rgba(245,230,200,0.3) 100%)",
+    image:
+      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800&h=400&fit=crop",
+    overlayColor:
+      "linear-gradient(90deg, rgba(245,230,200,0.92) 45%, rgba(245,230,200,0.3) 100%)",
     headline: "Get Loan Against\nProperty",
     subtext: "At a competitive interest rate starting from ",
     highlight: "9.00%",
@@ -123,8 +153,10 @@ const HERO_SLIDES = [
   },
   {
     id: 2,
-    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=400&fit=crop",
-    overlayColor: "linear-gradient(90deg, rgba(30,30,60,0.88) 45%, rgba(30,30,60,0.3) 100%)",
+    image:
+      "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=400&fit=crop",
+    overlayColor:
+      "linear-gradient(90deg, rgba(30,30,60,0.88) 45%, rgba(30,30,60,0.3) 100%)",
     headline: "Find the Best\nDeals Near You",
     subtext: "Discover top-rated stores and ",
     highlight: "exclusive offers",
@@ -140,28 +172,32 @@ const SERVICE_CARDS = [
     label: "B2B",
     sub: "Quick Quotes",
     bg: "linear-gradient(135deg, #2563eb, #1d4ed8)",
-    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=230&fit=crop&crop=top",
+    image:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=230&fit=crop&crop=top",
   },
   {
     id: 2,
     label: "REPAIRS & SERVICES",
     sub: "Get Nearest Vendor",
     bg: "linear-gradient(135deg, #7c3aed, #6d28d9)",
-    image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=200&h=230&fit=crop&crop=top",
+    image:
+      "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=200&h=230&fit=crop&crop=top",
   },
   {
     id: 3,
     label: "REAL ESTATE",
     sub: "Finest Agents",
     bg: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-    image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=200&h=230&fit=crop&crop=top",
+    image:
+      "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=200&h=230&fit=crop&crop=top",
   },
   {
     id: 4,
     label: "DOCTORS",
     sub: "Book Now",
     bg: "linear-gradient(135deg, #059669, #047857)",
-    image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&h=230&fit=crop&crop=top",
+    image:
+      "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&h=230&fit=crop&crop=top",
   },
 ];
 
@@ -176,7 +212,8 @@ const FEED_MODES: Array<{ key: FeedMode; label: string; icon: string }> = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const fallbackImage = "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&h=400&fit=crop";
+const fallbackImage =
+  "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&h=400&fit=crop";
 const normalizeText = (v: unknown) =>
   String(v ?? "")
     .toLowerCase()
@@ -272,14 +309,32 @@ const renderStars = (rating: number) =>
 
 function HeroBanner() {
   const [current, setCurrent] = useState(0);
+  const [ads, setAds] = useState<Ad[]>([]);
+  const [adsLoading, setAdsLoading] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Fetch Ads ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    axiosInstance
+      .get("/api/ads")
+      .then((res) => {
+        const sorted = (res.data.ads || [])
+          .filter((a: Ad) => a.isActive)
+          .sort((a: Ad, b: Ad) => (a.rank ?? 99) - (b.rank ?? 99));
+        setAds(sorted);
+      })
+      .catch(() => setAds([]))
+      .finally(() => setAdsLoading(false));
+  }, []);
+
+  // ── Auto Slide ─────────────────────────────────────────────────────────────
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
+    if (ads.length <= 1) return;
     timerRef.current = setInterval(() => {
-      setCurrent((p) => (p + 1) % HERO_SLIDES.length);
+      setCurrent((p) => (p + 1) % ads.length);
     }, 4500);
-  }, []);
+  }, [ads.length]);
 
   useEffect(() => {
     startTimer();
@@ -288,82 +343,153 @@ function HeroBanner() {
     };
   }, [startTimer]);
 
-  const go = (idx: number) => { setCurrent(idx); startTimer(); };
-  const prev = () => { setCurrent((p) => (p - 1 + HERO_SLIDES.length) % HERO_SLIDES.length); startTimer(); };
-  const next = () => { setCurrent((p) => (p + 1) % HERO_SLIDES.length); startTimer(); };
-  const slide = HERO_SLIDES[current];
+  useEffect(() => {
+    setCurrent(0);
+  }, [ads]);
+
+  const go = (idx: number) => {
+    setCurrent(idx);
+    startTimer();
+  };
+  const prev = () => {
+    setCurrent((p) => (p - 1 + ads.length) % ads.length);
+    startTimer();
+  };
+  const next = () => {
+    setCurrent((p) => (p + 1) % ads.length);
+    startTimer();
+  };
+
+  // ── Skeleton ───────────────────────────────────────────────────────────────
+  if (adsLoading) {
+    return (
+      <div className="flex gap-3">
+        <div
+          className="relative flex-1 min-w-0 overflow-hidden rounded-2xl bg-slate-100 animate-pulse"
+          style={{ height: 230 }}
+        />
+        <div
+          className="hidden sm:grid grid-cols-2 gap-2 shrink-0"
+          style={{ width: "43%", height: 230 }}
+        >
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-xl bg-slate-100 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex gap-3">
-      {/* LEFT: Wide Slider */}
+      {/* LEFT: Ad Slider */}
       <div
-        className="relative flex-1 min-w-0 overflow-hidden rounded-2xl"
+        className="relative flex-1 min-w-0 overflow-hidden rounded-2xl bg-slate-900"
         style={{ height: 230 }}
       >
-        {HERO_SLIDES.map((s, idx) => (
-          <div
-            key={s.id}
-            className="absolute inset-0 transition-opacity duration-700"
-            style={{ opacity: idx === current ? 1 : 0, zIndex: idx === current ? 1 : 0 }}
-          >
-            <img
-              src={s.image}
-              alt=""
-              className="absolute right-0 top-0 h-full w-auto object-cover object-top"
-              onError={(e: any) => { e.target.src = fallbackImage; }}
-            />
-            <div className="absolute inset-0" style={{ background: s.overlayColor }} />
+        {ads.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-slate-400 text-sm">
+            No ads available
           </div>
-        ))}
+        ) : (
+          <>
+            {/* Slides */}
+            {ads.map((ad, idx) => (
+              <div
+                key={ad._id}
+                className="absolute inset-0 transition-opacity duration-700"
+                style={{
+                  opacity: idx === current ? 1 : 0,
+                  zIndex: idx === current ? 1 : 0,
+                }}
+              >
+                {/* BG Image */}
+                {ad.image && (
+                  <img
+                    src={ad.image}
+                    alt={ad.title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    onError={(e: any) => {
+                      e.target.style.display = "none";
+                    }}
+                  />
+                )}
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
 
-        {/* Text content */}
-        <div className="absolute inset-0 z-10 flex flex-col justify-center p-6 max-w-[55%]">
-          <h2 className="text-xl font-black leading-tight text-slate-900 sm:text-2xl"
-            style={{ whiteSpace: "pre-line" }}>
-            {slide.headline}
-          </h2>
-          <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-            {slide.subtext}
-            <span className="font-black text-amber-600">{slide.highlight}</span>
-            {slide.subtext2}
-          </p>
-          <button className="mt-4 w-fit rounded-lg bg-amber-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-amber-700 shadow-md">
-            {slide.cta}
-          </button>
-          <p className="mt-2 text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-            {slide.brand}
-          </p>
-        </div>
+                {/* Text */}
+                <div className="absolute inset-0 z-10 flex flex-col justify-center p-6 max-w-[75%]">
+                  <span className="mb-2 w-fit rounded-full bg-amber-500/20 border border-amber-400/40 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-300">
+                    Advertisement
+                  </span>
+                  <h2 className="text-xl font-black leading-tight text-white sm:text-2xl">
+                    {ad.title}
+                  </h2>
+                  {ad.description && (
+                    <p className="mt-1.5 text-xs text-white/70 leading-relaxed line-clamp-2">
+                      {ad.description}
+                    </p>
+                  )}
+                  {ad.redirectUrl &&
+                    ad.redirectUrl !== "https://" &&
+                    ad.redirectUrl.startsWith("http") && (
+                      <a
+                        href={ad.redirectUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-4 w-fit rounded-lg bg-amber-500 px-5 py-2 text-sm font-bold text-white transition hover:bg-amber-600 shadow-md"
+                      >
+                        Learn More →
+                      </a>
+                    )}
+                </div>
+              </div>
+            ))}
 
-        {/* Dots */}
-        <div className="absolute bottom-3 left-6 z-10 flex gap-1.5">
-          {HERO_SLIDES.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => go(idx)}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                idx === current ? "w-5 bg-amber-600" : "w-1.5 bg-slate-400/50"
-              }`}
-            />
-          ))}
-        </div>
+            {/* Dots */}
+            {ads.length > 1 && (
+              <div className="absolute bottom-3 left-6 z-10 flex gap-1.5">
+                {ads.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => go(idx)}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      idx === current ? "w-5 bg-amber-400" : "w-1.5 bg-white/40"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
 
-        {/* Arrows */}
-        <button
-          onClick={prev}
-          className="absolute left-2 top-1/2 z-20 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 transition"
-        >
-          <i className="pi pi-chevron-left text-xs" />
-        </button>
-        <button
-          onClick={next}
-          className="absolute right-2 top-1/2 z-20 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 transition"
-        >
-          <i className="pi pi-chevron-right text-xs" />
-        </button>
+            {/* Rank badge */}
+            <div className="absolute bottom-3 right-4 z-10">
+              <span className="rounded-full bg-white/10 backdrop-blur-sm border border-white/20 px-2.5 py-0.5 text-[10px] font-semibold text-white/70">
+                {current + 1} / {ads.length}
+              </span>
+            </div>
+
+            {/* Arrows */}
+            {ads.length > 1 && (
+              <>
+                <button
+                  onClick={prev}
+                  className="absolute left-2 top-1/2 z-20 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition"
+                >
+                  <i className="pi pi-chevron-left text-xs" />
+                </button>
+                <button
+                  onClick={next}
+                  className="absolute right-2 top-1/2 z-20 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition"
+                >
+                  <i className="pi pi-chevron-right text-xs" />
+                </button>
+              </>
+            )}
+          </>
+        )}
       </div>
 
-      {/* RIGHT: 4 Service Cards */}
+      {/* RIGHT: 4 Service Cards (static — unchanged) */}
       <div
         className="hidden sm:grid grid-cols-2 gap-2 shrink-0"
         style={{ width: "43%", height: 230 }}
@@ -378,11 +504,11 @@ function HeroBanner() {
               src={card.image}
               alt={card.label}
               className="absolute bottom-0 right-0 h-full w-auto object-cover object-top opacity-70 group-hover:opacity-90 transition-opacity"
-              onError={(e: any) => { e.target.style.display = "none"; }}
+              onError={(e: any) => {
+                e.target.style.display = "none";
+              }}
             />
-            {/* Dark gradient so text is readable */}
             <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
-
             <div className="relative z-10 p-3">
               <p className="text-[10px] font-semibold text-white/75 leading-tight uppercase tracking-wide">
                 {card.sub}
@@ -391,7 +517,6 @@ function HeroBanner() {
                 {card.label}
               </h3>
             </div>
-
             <div className="absolute bottom-3 left-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-white group-hover:bg-white/40 transition">
               <i className="pi pi-chevron-right text-[10px]" />
             </div>
@@ -407,114 +532,245 @@ function HeroBanner() {
 function CategoryGrid({
   activeTab,
   onTabChange,
+  onSubCategorySelect,
 }: {
   activeTab: string;
   onTabChange: (label: string) => void;
+  onSubCategorySelect: (subCategoryId: string, subCategoryName: string) => void; // ← add
 }) {
   const [showAll, setShowAll] = useState(false);
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<ApiCategory | null>(
+    null,
+  );
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const sliderRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    axiosInstance.get("/api/category").then((res) => {
+      setCategories(res.data.categories || []);
+    });
+  }, []);
 
   const scroll = (direction: "left" | "right") => {
     if (!sliderRef.current) return;
-
     sliderRef.current.scrollBy({
       left: direction === "left" ? -300 : 300,
       behavior: "smooth",
     });
   };
 
-  const renderCategoryButton = (
-    label: string,
-    icon?: string,
-    isAll?: boolean,
-  ) => (
+  const handleCategoryClick = async (cat: ApiCategory) => {
+    setModalOpen(true);
+    setModalLoading(true);
+    try {
+      const res = await axiosInstance.get(`/api/category/${cat._id}`);
+      setSelectedCategory(res.data.category);
+    } catch {
+      setSelectedCategory(cat);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setSelectedCategory(null);
+  };
+
+  const renderCategoryBtn = (cat: ApiCategory) => (
     <button
-      key={label}
-      onClick={() =>
-        onTabChange(isAll ? "all" : activeTab === label ? "all" : label)
-      }
-      className={`flex shrink-0 flex-col items-center gap-2 rounded-xl border px-3 py-3 transition hover:border-orange-400 hover:shadow-sm ${
-        activeTab === label || (isAll && activeTab === "all")
+      key={cat._id}
+      onClick={() => handleCategoryClick(cat)}
+      className="flex shrink-0 flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 transition hover:border-orange-400 hover:shadow-sm"
+      style={{ minWidth: 90 }}
+    >
+      {cat.image ? (
+        <img
+          src={cat.image}
+          alt={cat.name}
+          className="h-11 w-11 rounded-lg object-cover"
+        />
+      ) : (
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-orange-100 text-xl">
+          🏪
+        </div>
+      )}
+      <span className="text-center text-[11px] font-semibold leading-tight text-slate-700 line-clamp-2">
+        {cat.name}
+      </span>
+    </button>
+  );
+
+  const allBtn = (
+    <button
+      key="all"
+      onClick={() => onTabChange("all")}
+      className={`flex shrink-0 flex-col items-center gap-2 rounded-xl border px-3 py-3 transition hover:border-orange-400 ${
+        activeTab === "all"
           ? "border-orange-400 bg-orange-50"
           : "border-slate-200 bg-white"
       }`}
       style={{ minWidth: 90 }}
     >
-      {isAll ? (
-        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-2xl">
-          🏠
-        </div>
-      ) : (
-        <img
-          src={icon}
-          alt={label}
-          className="h-11 w-11 object-contain"
-          onError={(e: any) => {
-            e.target.style.display = "none";
-          }}
-        />
-      )}
-
+      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-2xl">
+        🏠
+      </div>
       <span className="text-center text-[11px] font-semibold leading-tight text-slate-700">
-        {label}
+        All
       </span>
     </button>
   );
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setShowAll(!showAll)}
-          className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium hover:bg-slate-50"
-        >
-          <Grid3X3 size={14} />
-          {showAll ? "Slider View" : "Show All"}
-        </button>
+    <>
+      <div>
+        {showAll ? (
+          <>
+            <div className="flex justify-end mb-3">
+              <button
+                onClick={() => setShowAll(false)}
+                className="flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-500 shadow-sm hover:bg-slate-50"
+              >
+                <ChevronLeft size={11} /> Show Less
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+              {allBtn}
+              {categories.map(renderCategoryBtn)}
+            </div>
+          </>
+        ) : (
+          <div className="relative">
+            <button
+              onClick={() => scroll("left")}
+              className="absolute left-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white p-2 shadow-md border border-slate-200"
+            >
+              <ChevronLeft size={18} />
+            </button>
+
+            <div
+              ref={sliderRef}
+              className="flex gap-3 overflow-x-hidden scroll-smooth px-10"
+            >
+              {allBtn}
+              {categories.map(renderCategoryBtn)}
+
+              {/* ── Show All — slider এর শেষে ── */}
+              <button
+                onClick={() => setShowAll(true)}
+                className="flex shrink-0 flex-col items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-3 transition hover:border-orange-400 hover:bg-orange-100"
+                style={{ minWidth: 90 }}
+              >
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-orange-100">
+                  <Grid3X3 size={22} className="text-orange-500" />
+                </div>
+                <span className="text-center text-[11px] font-semibold leading-tight text-orange-500">
+                  Show All
+                </span>
+              </button>
+            </div>
+
+            <button
+              onClick={() => scroll("right")}
+              className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white p-2 shadow-md border border-slate-200"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Grid View */}
-      {showAll ? (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-          {renderCategoryButton("all", undefined, true)}
-
-          {CATEGORY_ICONS.map((cat) =>
-            renderCategoryButton(cat.label, cat.icon),
-          )}
-        </div>
-      ) : (
-        <div className="relative">
-          {/* Left Arrow */}
-          <button
-            onClick={() => scroll("left")}
-            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white p-2 shadow-md border border-slate-200"
-          >
-            <ChevronLeft size={18} />
-          </button>
-
-          {/* Slider */}
+      {/* ── SubCategory Modal ── */}
+      {modalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={closeModal}
+        >
           <div
-            ref={sliderRef}
-            className="flex gap-3 overflow-x-hidden scroll-smooth px-10"
+            className="relative w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
           >
-            {renderCategoryButton("all", undefined, true)}
+            {/* Modal Header */}
+            <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+              {selectedCategory?.image && (
+                <img
+                  src={selectedCategory.image}
+                  alt={selectedCategory?.name}
+                  className="h-10 w-10 rounded-xl object-cover"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-slate-900 text-base">
+                  {selectedCategory?.name || "Category"}
+                </h3>
+                {selectedCategory?.description && (
+                  <p className="text-xs text-slate-500 truncate">
+                    {selectedCategory.description}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={closeModal}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition"
+              >
+                <i className="pi pi-times text-xs" />
+              </button>
+            </div>
 
-            {CATEGORY_ICONS.map((cat) =>
-              renderCategoryButton(cat.label, cat.icon),
-            )}
+            {/* Modal Body */}
+            <div className="p-5 max-h-[60vh] overflow-y-auto">
+              {modalLoading ? (
+                <div className="grid grid-cols-3 gap-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="flex flex-col items-center gap-2 rounded-xl border border-slate-100 p-3 animate-pulse"
+                    >
+                      <div className="h-14 w-14 rounded-xl bg-slate-100" />
+                      <div className="h-3 w-16 rounded-full bg-slate-100" />
+                    </div>
+                  ))}
+                </div>
+              ) : selectedCategory?.subCategories?.length ? (
+                <div className="grid grid-cols-3 gap-3">
+                  {selectedCategory.subCategories.map((sub) => (
+                    <button
+                      key={sub._id}
+                      onClick={() => {
+                        onSubCategorySelect(sub._id, sub.name);
+                        closeModal();
+                      }}
+                      className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 transition hover:border-orange-400 hover:bg-orange-50"
+                    >
+                      {sub.image ? (
+                        <img
+                          src={sub.image}
+                          alt={sub.name}
+                          className="h-14 w-14 rounded-xl object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-orange-100 text-2xl">
+                          🏪
+                        </div>
+                      )}
+                      <span className="text-center text-[11px] font-semibold leading-tight text-slate-700 line-clamp-2">
+                        {sub.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-8 text-center text-slate-400 text-sm">
+                  No subcategories found
+                </div>
+              )}
+            </div>
           </div>
-
-          {/* Right Arrow */}
-          <button
-            onClick={() => scroll("right")}
-            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white p-2 shadow-md border border-slate-200"
-          >
-            <ChevronRight size={18} />
-          </button>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -651,6 +907,33 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_SIZE);
   const [activeCategoryTab, setActiveCategoryTab] = useState("all");
+  const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(
+    null,
+  );
+  const [subCategoryStores, setSubCategoryStores] = useState<Store[]>([]);
+  const [subCategoryLoading, setSubCategoryLoading] = useState(false);
+  const [categoryViewActive, setCategoryViewActive] = useState(false);
+  const [categoryViewName, setCategoryViewName] = useState("");
+
+  const fetchStoresBySubCategory = async (subCategoryId: string) => {
+    setSubCategoryLoading(true);
+    setActiveSubCategoryId(subCategoryId);
+    try {
+      const res = await axiosInstance.get(
+        `/api/register/stores-by-subcategory/${subCategoryId}`,
+      );
+      setSubCategoryStores(res.data.stores || []);
+    } catch {
+      setSubCategoryStores([]);
+    } finally {
+      setSubCategoryLoading(false);
+    }
+  };
+
+  const clearSubCategoryFilter = () => {
+    setActiveSubCategoryId(null);
+    setSubCategoryStores([]);
+  };
 
   // fetch
   useEffect(() => {
@@ -723,15 +1006,14 @@ export default function Home() {
 
   const visibleStores = useMemo(() => {
     const q = normalizeText(search);
-    const catKey = normalizeText(selectedCategory);
     const stateKey =
       selectedState === "all" ? "" : normalizeText(selectedState);
     const areaKey = selectedArea === "all" ? "" : normalizeText(selectedArea);
-    const tabKey =
-      activeCategoryTab === "all" ? "" : normalizeText(activeCategoryTab);
-
     const locationKey = normalizeText(location);
-    let stores = allStores.filter((s) => {
+
+    const baseStores = activeSubCategoryId ? subCategoryStores : allStores;
+
+    let stores = baseStores.filter((s) => {
       const searchable = normalizeText(
         [
           s.storeName,
@@ -753,15 +1035,12 @@ export default function Home() {
         );
         if (!locationSearch.includes(locationKey)) return false;
       }
-      if (selectedCategory !== "all" && normalizeText(s.storeType) !== catKey)
-        return false;
       if (
         stateKey &&
         normalizeText(canonicalizeState(s.address?.state)) !== stateKey
       )
         return false;
       if (areaKey && normalizeText(s.address?.area) !== areaKey) return false;
-      if (tabKey && normalizeText(s.storeType) !== tabKey) return false;
       return true;
     });
 
@@ -790,12 +1069,13 @@ export default function Home() {
     }
   }, [
     allStores,
+    subCategoryStores,
+    activeSubCategoryId,
     search,
     activeFeed,
-    selectedCategory,
     selectedState,
     selectedArea,
-    activeCategoryTab,
+    location,
   ]);
 
   const pagedStores = useMemo(
@@ -810,7 +1090,8 @@ export default function Home() {
     selectedCategory !== "all" ||
     selectedState !== "all" ||
     selectedArea !== "all" ||
-    activeCategoryTab !== "all"
+    activeCategoryTab !== "all" ||
+    activeSubCategoryId // ← add
   );
 
   const clearAll = () => {
@@ -821,9 +1102,171 @@ export default function Home() {
     setSelectedState("all");
     setSelectedArea("all");
     setActiveCategoryTab("all");
+    clearSubCategoryFilter();
+    setCategoryViewActive(false); // ← reset
+    setCategoryViewName("");
   };
 
   if (loading) return <VortexLoader />;
+
+  if (categoryViewActive) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900">
+        <Header />
+
+        {/* ── Sticky Top Bar: Category + Search + Filters ── */}
+        <div className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
+          {/* Category Slider */}
+          <div className="px-4 pt-3 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl">
+              <CategoryGrid
+                activeTab={activeCategoryTab}
+                onTabChange={(label) => {
+                  setActiveCategoryTab(label);
+                  if (label === "all") clearAll();
+                }}
+                onSubCategorySelect={(subId, subName) => {
+                  setActiveCategoryTab(subName);
+                  setCategoryViewName(subName);
+                  fetchStoresBySubCategory(subId);
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Search + Filter Pills */}
+          <div className="px-4 pb-3 pt-2 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl flex items-center gap-2">
+              {/* Back button */}
+              <button
+                onClick={clearAll}
+                className="flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+              >
+                <ChevronLeft size={14} />
+                Back
+              </button>
+
+              {/* Search */}
+              <div className="relative flex-1">
+                <i className="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+                <input
+                  type="text"
+                  placeholder={`Search in ${categoryViewName}...`}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-full border border-slate-200 bg-slate-50 py-2 pl-8 pr-4 text-sm text-slate-800 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100 transition"
+                />
+              </div>
+
+              {/* Filter Pills — desktop */}
+              <div className="hidden items-center gap-1.5 sm:flex">
+                {FEED_MODES.slice(0, 4).map((mode) => (
+                  <button
+                    key={mode.key}
+                    onClick={() => setActiveFeed(mode.key)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition whitespace-nowrap ${
+                      activeFeed === mode.key
+                        ? "bg-blue-600 text-white shadow"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mobile filter pills */}
+            <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5 sm:hidden">
+              {FEED_MODES.slice(0, 4).map((mode) => (
+                <button
+                  key={mode.key}
+                  onClick={() => setActiveFeed(mode.key)}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    activeFeed === mode.key
+                      ? "bg-blue-600 text-white shadow"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Results Header ── */}
+        <div className="mx-auto max-w-7xl px-4 pt-4 pb-2 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-black text-slate-900">
+                {categoryViewName}
+              </h2>
+              <p className="text-xs text-slate-400">
+                {visibleStores.length} stores found
+                {search.trim() ? ` for "${search}"` : ""}
+              </p>
+            </div>
+            {search.trim() && (
+              <button
+                onClick={() => setSearch("")}
+                className="text-xs font-semibold text-blue-500 hover:underline"
+              >
+                Clear search
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── Store Grid ── */}
+        <div className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
+          {subCategoryLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          ) : visibleStores.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-14 text-center">
+              <div className="mx-auto mb-3 text-5xl">🔍</div>
+              <p className="font-bold text-slate-900">
+                No stores in {categoryViewName}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                Try a different subcategory or clear the search.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {pagedStores.map((store) => (
+                  <StoreCard key={store._id} store={store} />
+                ))}
+              </div>
+              {canLoadMore && (
+                <div className="flex justify-center pt-6">
+                  <button
+                    onClick={() =>
+                      setVisibleCount((c) =>
+                        Math.min(c + LOAD_STEP, visibleStores.length),
+                      )
+                    }
+                    className="rounded-full border border-slate-300 bg-white px-8 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                  >
+                    Load more (
+                    {Math.min(LOAD_STEP, visibleStores.length - visibleCount)}{" "}
+                    more)
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -832,11 +1275,18 @@ export default function Home() {
       {/* ════════════════════════════════════════
           SECTION 3 — Category Icons (JD tiles)
       ════════════════════════════════════════ */}
-      <section className="border-b border-slate-200 bg-white px-4 py-5 sm:px-6 lg:px-8">
+      <section className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <CategoryGrid
             activeTab={activeCategoryTab}
             onTabChange={setActiveCategoryTab}
+            onSubCategorySelect={(subId, subName) => {
+              clearSubCategoryFilter();
+              setActiveCategoryTab(subName);
+              fetchStoresBySubCategory(subId);
+              setCategoryViewActive(true);
+              setCategoryViewName(subName);
+            }}
           />
         </div>
       </section>
@@ -955,7 +1405,7 @@ export default function Home() {
                   Try again
                 </button>
               </div>
-            ) : loading ? (
+            ) : loading || subCategoryLoading ? (
               <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: 9 }).map((_, i) => (
                   <SkeletonCard key={i} />

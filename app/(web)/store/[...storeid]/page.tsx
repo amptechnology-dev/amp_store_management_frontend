@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import { Button } from "primereact/button";
@@ -30,6 +30,16 @@ interface Product {
   __v: number;
 }
 
+interface Ad {
+  _id: string;
+  title: string;
+  description?: string;
+  image?: string;
+  redirectUrl?: string;
+  rank?: number;
+  isActive?: boolean;
+}
+
 interface User {
   _id: string;
   name: string;
@@ -51,6 +61,16 @@ interface Review {
   userId: ReviewUser;
   createdAt: string;
   updatedAt: string;
+}
+
+interface ReviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  storeName: string;
+  onSubmit: (rating: number, comment: string) => Promise<void>;
+  submitting: boolean;
+  submitError: string | null;
+  submitSuccess: string | null;
 }
 
 interface Address {
@@ -576,37 +596,43 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex flex-1 flex-col justify-between gap-2 p-1">
-          <div className="flex-1">
-            <h4 className="line-clamp-1 text-sm font-bold text-slate-900">
-              Name : {product.name}
-            </h4>
-          </div>
+        <div className="flex flex-1 flex-col gap-2 p-3">
+          {/* Name */}
+          <h4 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900">
+            {product.name}
+          </h4>
+
+          {/* Price + Photos */}
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-lg font-black text-amber-600">
-                Price : ₹{product.sellingPrice.toLocaleString("en-IN")}
-              </p>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
+                Price
+              </span>
+              <span className="text-base font-black text-amber-600">
+                ₹{product.sellingPrice.toLocaleString("en-IN")}
+              </span>
             </div>
             {images.length > 1 && (
               <button
                 onClick={() => setLightboxOpen(true)}
-                className="flex items-center gap-1 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-100"
+                className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-400 transition hover:bg-slate-100"
               >
-                <i className="pi pi-images text-xs" />
-                {images.length} photos
+                <i className="pi pi-images text-[10px]" />
+                {images.length}
               </button>
             )}
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {/* Actions */}
+          <div className="flex items-center gap-2 mt-auto">
             <button
               onClick={onAddToCart}
-              className="flex w-full flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2 text-xs font-bold text-white shadow-sm transition hover:from-amber-600 hover:to-orange-600 hover:shadow-md active:scale-95 sm:w-auto sm:py-2.5 sm:text-sm"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2 text-xs font-bold text-white shadow-sm transition hover:from-amber-600 hover:to-orange-600 active:scale-95"
             >
-              <i className="pi pi-shopping-cart text-sm" />
+              <i className="pi pi-shopping-cart text-xs" />
               Add to Cart
             </button>
+
             <a
               href={buildWhatsAppShareUrl(
                 storeWhatsapp,
@@ -614,10 +640,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
               )}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex h-9 w-full items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm transition hover:bg-emerald-600 sm:h-10 sm:w-10"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm transition hover:bg-emerald-600"
               title="Enquire on WhatsApp"
             >
-              <i className="pi pi-whatsapp text-base" />
+              <i className="pi pi-whatsapp text-sm" />
             </a>
           </div>
         </div>
@@ -680,6 +706,199 @@ const ProductCard: React.FC<ProductCardProps> = ({
   );
 };
 
+const ReviewModal: React.FC<ReviewModalProps> = ({
+  isOpen,
+  onClose,
+  storeName,
+  onSubmit,
+  submitting,
+  submitError,
+  submitSuccess,
+}) => {
+  const [rating, setRating] = useState(0);
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [comment, setComment] = useState("");
+
+  useEffect(() => {
+    if (submitSuccess) {
+      const t = setTimeout(() => {
+        onClose();
+        setRating(0);
+        setComment("");
+      }, 1500);
+      return () => clearTimeout(t);
+    }
+  }, [submitSuccess, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const ratingLabels: Record<number, { label: string; color: string }> = {
+    1: { label: "Poor", color: "text-red-500" },
+    2: { label: "Fair", color: "text-orange-500" },
+    3: { label: "Good", color: "text-yellow-500" },
+    4: { label: "Very Good", color: "text-lime-500" },
+    5: { label: "Excellent", color: "text-emerald-500" },
+  };
+
+  const active = hoveredRating || rating;
+
+  return (
+    <div
+      className="fixed inset-0 z-[1001] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="review-modal-title"
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:max-w-md bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-orange-50">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm">
+              <i className="pi pi-star-fill text-white text-xs" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600 leading-none">
+                Rate & Review
+              </p>
+              <h2
+                id="review-modal-title"
+                className="text-sm font-black text-slate-900 leading-tight truncate max-w-[200px]"
+              >
+                {storeName}
+              </h2>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-slate-400 border border-slate-200 transition hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Close"
+          >
+            <i className="pi pi-times text-xs" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 space-y-3.5">
+          {/* Star Rating */}
+          <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+              Your Rating
+            </p>
+            <div className="flex items-center justify-center gap-1.5">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => setRating(star)}
+                  onMouseEnter={() => setHoveredRating(star)}
+                  onMouseLeave={() => setHoveredRating(0)}
+                  className="transition-transform hover:scale-110 active:scale-95"
+                >
+                  <i
+                    className={`pi pi-star-fill text-2xl transition-colors duration-150 ${
+                      star <= active ? "text-amber-400" : "text-slate-200"
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+            {active ? (
+              <p
+                className={`mt-1.5 text-xs font-bold ${ratingLabels[active].color}`}
+              >
+                {ratingLabels[active].label}
+              </p>
+            ) : (
+              <p className="mt-1.5 text-xs text-slate-300">
+                Tap a star to rate
+              </p>
+            )}
+          </div>
+
+          {/* Comment */}
+          <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 pt-3 pb-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+              Your Review
+            </p>
+            <textarea
+              value={comment}
+              onChange={(e) => {
+                if (e.target.value.length <= 500) setComment(e.target.value);
+              }}
+              placeholder="Share your experience with this store..."
+              className="w-full resize-none bg-transparent text-sm leading-relaxed text-slate-800 placeholder-slate-300 focus:outline-none"
+              rows={3}
+            />
+            <div className="flex items-center justify-between border-t border-slate-200 pt-1.5 mt-1">
+              <span className="text-[10px] text-slate-300">
+                {comment.length === 0 ? "Min 1 character" : ""}
+              </span>
+              <span
+                className={`text-[10px] font-semibold ${comment.length >= 450 ? "text-orange-500" : "text-slate-300"}`}
+              >
+                {comment.length}/500
+              </span>
+            </div>
+          </div>
+
+          {/* Error / Success */}
+          {submitError && (
+            <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-100 px-3.5 py-2.5 text-xs font-semibold text-red-600">
+              <i className="pi pi-exclamation-circle shrink-0" />
+              {submitError}
+            </div>
+          )}
+          {submitSuccess && (
+            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-100 px-3.5 py-2.5 text-xs font-semibold text-emerald-600">
+              <i className="pi pi-check-circle shrink-0" />
+              {submitSuccess}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-2.5 px-5 pb-5 pt-1">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:border-slate-300"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => await onSubmit(rating, comment)}
+            disabled={submitting || rating === 0 || comment.trim().length === 0}
+            className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2.5 text-sm font-bold text-white shadow-sm transition hover:from-amber-600 hover:to-orange-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {submitting ? (
+              <>
+                <i className="pi pi-spin pi-spinner text-sm" />
+                Posting...
+              </>
+            ) : (
+              <>
+                <i className="pi pi-send text-sm" />
+                Post Review
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function StoreDetails() {
   const params = useParams();
@@ -687,7 +906,12 @@ export default function StoreDetails() {
   const dispatch = useAppDispatch();
 
   const [store, setStore] = useState<Store | null>(null);
+  const [isMapOpen, setIsMapOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
+  const [showAllProducts, setShowAllProducts] = useState(false);
+  const [visibleProductCount, setVisibleProductCount] = useState(9);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewRating, setReviewRating] = useState(0);
@@ -698,6 +922,7 @@ export default function StoreDetails() {
   const [reviewSubmitSuccess, setReviewSubmitSuccess] = useState<string | null>(
     null,
   );
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
@@ -705,11 +930,19 @@ export default function StoreDetails() {
   const [authReady, setAuthReady] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"products" | "reviews" | "hours">(
     "products",
   );
-  const [adIndex, setAdIndex] = useState(0);
-  const ads = ["Ad 1", "Ad 2", "Ad 3", "Ad 4"];
+  const [ads, setAds] = useState<Ad[]>([]);
+  const [adsLoading, setAdsLoading] = useState(true);
+  const adsScrollRef = useRef<HTMLDivElement>(null);
+  const scrollAds = (dir: "left" | "right") => {
+    adsScrollRef.current?.scrollBy({
+      left: dir === "right" ? 200 : -200,
+      behavior: "smooth",
+    });
+  };
 
   const fetchReviews = async (currentStoreId: string) => {
     const reviewResponse = await axiosInstance.get(
@@ -785,6 +1018,33 @@ export default function StoreDetails() {
       window.removeEventListener("auth-changed", handleAuthChanged);
       window.removeEventListener("storage", handleStorage);
     };
+  }, []);
+
+  useEffect(() => {
+    axiosInstance
+      .get("/api/ads")
+      .then((res) => {
+        const sorted = (res.data.ads || [])
+          .filter((a: Ad) => a.isActive)
+          .sort((a: Ad, b: Ad) => (a.rank ?? 99) - (b.rank ?? 99));
+        setAds(sorted);
+      })
+      .catch(() => setAds([]))
+      .finally(() => setAdsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!adsScrollRef.current) return;
+      const { scrollLeft, scrollWidth, clientWidth } = adsScrollRef.current;
+      const isAtEnd = scrollLeft + clientWidth >= scrollWidth - 10;
+      if (isAtEnd) {
+        adsScrollRef.current.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        adsScrollRef.current.scrollBy({ left: 190, behavior: "smooth" });
+      }
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -933,14 +1193,14 @@ export default function StoreDetails() {
     );
   }
 
-  const handleSubmitReview = async () => {
+  const handleSubmitReview = async (rating: number, comment: string) => {
     if (!storeId) return;
-    const trimmedComment = reviewComment.trim();
+    const trimmedComment = comment.trim();
     if (!trimmedComment) {
       setReviewSubmitError("Please write a comment before submitting.");
       return;
     }
-    if (reviewRating < 1 || reviewRating > 5) {
+    if (rating < 1 || rating > 5) {
       setReviewSubmitError("Please choose a rating between 1 and 5.");
       return;
     }
@@ -950,12 +1210,10 @@ export default function StoreDetails() {
       setReviewSubmitSuccess(null);
       await axiosInstance.post(`/api/review/add-review/${storeId}`, {
         comment: trimmedComment,
-        rating: reviewRating,
+        rating,
       });
       await fetchReviews(storeId);
-      setReviewComment("");
-      setReviewRating(0);
-      setReviewSubmitSuccess("Your review was posted successfully.");
+      setReviewSubmitSuccess("Your review was posted successfully! 🎉");
     } catch (submitErr: any) {
       setReviewSubmitError(
         submitErr?.response?.data?.message ||
@@ -968,146 +1226,290 @@ export default function StoreDetails() {
 
   const storeIsOpenNow = isStoreOpenNow(store.timing.open, store.timing.close);
   const averageRating = getAverageRating(reviews);
+  const visibleReviews = reviews.slice(0, 5);
+  const hasMoreReviews = reviews.length > visibleReviews.length;
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f8f9fa] text-slate-900">
       <Header />
 
       <main className="mx-auto w-full max-w-6xl overflow-x-hidden px-2 py-4 sm:px-6 sm:py-6 lg:px-8">
-        {/* ============================================== */}
-        {/* STORE INFO CARD - TOP */}
-        {/* ============================================== */}
-        <div className="mb-4 grid min-w-0 gap-3 lg:grid-cols-3 items-start">
-          {/* Left: Store Images — self-start stops it from stretching */}
-          <div className="lg:col-span-2 min-w-0 self-start overflow-hidden rounded-2xl bg-white shadow-sm">
-            <ImageGallery images={store.images} storeName={store.storeName} />
-          </div>
-
-          {/* Right: Store Info — self-start so it doesn't create extra height */}
-          <aside className="min-w-0 self-start rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm sm:p-5">
-            {/* Back Button */}
-            <Link
-              href="/store"
-              className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition hover:text-amber-600"
-            >
-              <i className="pi pi-arrow-left text-xs" />
-              Back to Stores
-            </Link>
-
-            <h1 className="text-xl font-black text-slate-900 mb-1">
-              {store.storeName}
-            </h1>
-
-            {store.storeType && (
-              <p className="text-xs text-slate-500 mb-2">{store.storeType}</p>
-            )}
-
-            {/* Rating Summary */}
-            <div className="mb-3 pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="flex gap-0.5">
-                  {renderRatingStars(averageRating, "text-sm")}
-                </div>
-                <span className="text-sm font-semibold text-slate-700">
-                  {averageRating.toFixed(1)} ({reviews.length})
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">
-                Based on customer reviews
-              </p>
-            </div>
-
-            {/* Status Badge */}
-            <div className="mb-3 pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                    storeIsOpenNow
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  <i
-                    className={`pi ${storeIsOpenNow ? "pi-check-circle" : "pi-times-circle"}`}
+        <div className="min-w-0 space-y-3">
+          {/* TOP SECTION — Images + Sidebar side by side */}
+          <div className="space-y-3">
+            {/* Images + Sidebar + First 3 Products */}
+            <div className="grid min-w-0 gap-3 lg:grid-cols-3 items-start">
+              {/* LEFT — Images + First 3 Products */}
+              <div className="lg:col-span-2 min-w-0 flex flex-col gap-3">
+                {/* Images */}
+                <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+                  <ImageGallery
+                    images={store.images}
+                    storeName={store.storeName}
                   />
-                  {storeIsOpenNow ? "Open Now" : "Closed"}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-1.5">
-                {store.timing.open} - {store.timing.close}
-              </p>
-            </div>
-
-            {/* Action Buttons — Google style */}
-            <div className="flex flex-wrap gap-2">
-              {store.website && (
-                <a
-                  href={store.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 min-w-[64px]"
-                >
-                  <i className="pi pi-globe text-blue-500 text-base" />
-                  Website
-                </a>
-              )}
-
-              {store.whatsappNo && (
-                <a
-                  href={buildWhatsAppShareUrl(
-                    store.whatsappNo,
-                    `Hi, I found your store *${store.storeName}* on AMP Shopping!`,
-                  )}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 min-w-[64px]"
-                >
-                  <i className="pi pi-whatsapp text-emerald-500 text-base" />
-                  WhatsApp
-                </a>
-              )}
-
-              {store.contactNo && (
-                <a
-                  href={`tel:${store.contactNo}`}
-                  className="inline-flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 min-w-[64px]"
-                >
-                  <i className="pi pi-phone text-blue-500 text-base" />
-                  Call
-                </a>
-              )}
-            </div>
-          </aside>
-        </div>
-
-        {/* ============================================== */}
-        {/* MAIN CONTENT GRID */}
-        {/* ============================================== */}
-        <div className="grid min-w-0 gap-3 lg:grid-cols-3">
-          {/* Left Section - Products & Ads */}
-          <div className="min-w-0 lg:col-span-2 space-y-4">
-            {/* PRODUCTS */}
-            <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
-              <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <i className="pi pi-shopping-bag text-amber-500" />
-                  Products
-                  <span className="text-sm font-normal text-slate-500">
-                    ({products.length})
-                  </span>
-                </h2>
-              </div>
-
-              {products.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <i className="pi pi-inbox text-5xl text-slate-200 mb-3" />
-                  <p className="text-sm text-slate-400">
-                    No products available yet
-                  </p>
                 </div>
-              ) : (
-                <div className="grid min-w-0 grid-cols-2 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-                  {products.map((product) => (
+
+                {/* First 3 Products */}
+                <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
+                  <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
+                    <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                      <i className="pi pi-shopping-bag text-amber-500" />
+                      Products
+                      <span className="text-sm font-normal text-slate-500">
+                        ({products.length})
+                      </span>
+                    </h2>
+                  </div>
+
+                  {products.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <i className="pi pi-inbox text-5xl text-slate-200 mb-3" />
+                      <p className="text-sm text-slate-400">
+                        No products available yet
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+                        {products.slice(0, 9).map((product) => (
+                          <ProductCard
+                            key={product._id}
+                            product={product}
+                            storeWhatsapp={store.whatsappNo || store.contactNo}
+                            storeName={store.storeName}
+                            onAddToCart={() => {}}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Load More Button */}
+                      {products.length > 9 && !showAllProducts && (
+                        <div className="mt-5 flex justify-center">
+                          <button
+                            onClick={() => setShowAllProducts(true)}
+                            className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-6 py-2.5 text-sm font-bold text-amber-700 shadow-sm transition hover:bg-amber-100 hover:border-amber-400 active:scale-95"
+                          >
+                            <i className="pi pi-plus-circle text-sm" />
+                            Load More
+                            <span className="text-xs font-normal text-amber-500">
+                              ({products.length - 9} remaining)
+                            </span>
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* RIGHT — Sidebar */}
+              <aside className="min-w-0 flex flex-col rounded-2xl border border-slate-100 bg-white shadow-sm self-start sticky top-0">
+                <div className="px-4 pt-4 pb-3 border-b border-slate-100">
+                  <h1 className="text-base font-black text-slate-900 leading-snug">
+                    {store.storeName}
+                  </h1>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    {store.description}
+                  </p>
+
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="text-base font-black text-slate-900">
+                      {averageRating.toFixed(1)}
+                    </span>
+                    <div className="flex gap-0.5">
+                      {renderRatingStars(averageRating, "text-[11px]")}
+                    </div>
+                    <span className="text-[11px] text-slate-400">
+                      ({reviews.length})
+                    </span>
+                  </div>
+                </div>
+
+                <div className="px-4 py-3 border-b border-slate-100 space-y-2">
+                  {store.address?.area && (
+                    <div className="flex items-start gap-2">
+                      <i className="pi pi-map-marker text-slate-400 text-xs mt-0.5 shrink-0" />
+                      <p className="text-xs text-slate-700 leading-relaxed">
+                        {store.address.area}
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <i className="pi pi-clock text-slate-400 text-xs shrink-0" />
+                    <span
+                      className={`text-xs font-semibold ${storeIsOpenNow ? "text-emerald-600" : "text-red-500"}`}
+                    >
+                      {storeIsOpenNow ? "Open" : "Closed"}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      · Opens {store.timing.open}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap gap-2">
+                  {store.website && (
+                    <a
+                      href={store.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-amber-300 hover:bg-amber-50"
+                    >
+                      <i className="pi pi-globe text-blue-500 text-xs" />{" "}
+                      Website
+                    </a>
+                  )}
+                  {store.whatsappNo && (
+                    <a
+                      href={buildWhatsAppShareUrl(
+                        store.whatsappNo,
+                        `Hi, I found your store *${store.storeName}* on AMP Shopping!`,
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50"
+                    >
+                      <i className="pi pi-whatsapp text-emerald-500 text-xs" />{" "}
+                      WhatsApp
+                    </a>
+                  )}
+                  {store.contactNo && (
+                    <a
+                      href={`tel:${store.contactNo}`}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50"
+                    >
+                      <i className="pi pi-phone text-blue-500 text-xs" /> Call
+                    </a>
+                  )}
+
+                  {/* Directions Button */}
+                  {store.lat && store.long && (
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${store.lat},${store.long}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="#4285F4"
+                        className="h-3.5 w-3.5"
+                      >
+                        <path
+                          d="M12 2L4 10h5v8h6v-8h5L12 2z"
+                          transform="rotate(45 12 12)"
+                        />
+                      </svg>
+                      Directions
+                    </a>
+                  )}
+                  <button
+                    onClick={() => setIsShareOpen(true)}
+                    style={{ borderRadius: "9999px" }}
+                    className="inline-flex items-center gap-1.5 border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+                  >
+                    <i className="pi pi-share-alt text-slate-500 text-xs" />
+                    Share
+                  </button>
+                </div>
+
+                {/* Review List */}
+                <div className="divide-y divide-slate-100">
+                  <div className="px-4 py-3">
+                    <button
+                      onClick={() => setIsReviewModalOpen(true)}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2.5 text-sm font-bold text-white shadow-sm transition hover:from-amber-600 hover:to-orange-600 active:scale-95"
+                    >
+                      <i className="pi pi-star-fill text-sm" />
+                      Write a Review
+                    </button>
+                  </div>
+
+                  {reviews.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-4">
+                      <i className="pi pi-star text-xl text-slate-200 mb-1" />
+                      <p className="text-xs text-slate-400">
+                        No reviews yet. Be the first!
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {visibleReviews.map((review) => (
+                        <div
+                          key={review._id}
+                          className="flex items-start gap-2 px-3 py-2"
+                        >
+                          <div className="h-6 w-6 shrink-0 overflow-hidden rounded-full mt-0.5">
+                            {review.userId.picture ? (
+                              <img
+                                src={review.userId.picture}
+                                alt={review.userId.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-[9px] font-bold text-white">
+                                {review.userId.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <p className="text-[11px] font-bold text-slate-900 truncate leading-none">
+                                {review.userId.name}
+                              </p>
+                              <p className="text-[9px] text-slate-400 shrink-0 leading-none">
+                                {formatReviewDate(review.createdAt)}
+                              </p>
+                            </div>
+                            <div
+                              className="flex gap-0.5 mt-0.5 mb-0.5"
+                              style={{
+                                transform: "scale(0.6)",
+                                transformOrigin: "left center",
+                              }}
+                            >
+                              {renderRatingStars(review.rating, "text-xs")}
+                            </div>
+                            <p className="text-[11px] text-slate-600 leading-snug line-clamp-2">
+                              {review.comment}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+
+                      {reviews.length > 5 && (
+                        <button
+                          onClick={() => setIsReviewsModalOpen(true)}
+                          className="flex w-full items-center justify-center gap-1.5 bg-slate-50 py-2 text-[11px] font-semibold text-slate-600 transition hover:bg-amber-50 hover:text-amber-700"
+                        >
+                          <i className="pi pi-eye text-[10px]" />
+                          See all {reviews.length} reviews
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </aside>
+            </div>
+
+            {/* FULL WIDTH — Remaining Products after Load More */}
+            {showAllProducts && products.length > 9 && (
+              <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
+                <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
+                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i className="pi pi-shopping-bag text-amber-500" />
+                    More Products
+                  </h2>
+                  <button
+                    onClick={() => setShowAllProducts(false)}
+                    className="text-xs font-semibold text-slate-400 hover:text-slate-600 flex items-center gap-1"
+                  >
+                    <i className="pi pi-chevron-up text-xs" /> Show less
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {products.slice(9).map((product) => (
                     <ProductCard
                       key={product._id}
                       product={product}
@@ -1117,240 +1519,431 @@ export default function StoreDetails() {
                     />
                   ))}
                 </div>
-              )}
-            </div>
-
-            {/* ADS SECTION */}
-            <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
-              {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100">
-                    <i className="pi pi-megaphone text-amber-500 text-sm" />
-                  </span>
-                  <h2 className="text-sm font-bold text-slate-900">
-                    Featured Ads
-                  </h2>
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-600">
-                    SPONSORED
-                  </span>
-                </div>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() =>
-                      setAdIndex((prev) => (prev - 1 + ads.length) % ads.length)
-                    }
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600"
-                    aria-label="Prev ad"
-                  >
-                    <i className="pi pi-chevron-left text-xs" />
-                  </button>
-                  <button
-                    onClick={() =>
-                      setAdIndex((prev) => (prev + 1) % ads.length)
-                    }
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600"
-                    aria-label="Next ad"
-                  >
-                    <i className="pi pi-chevron-right text-xs" />
-                  </button>
-                </div>
               </div>
-
-              {/* Slider */}
-              <div className="relative overflow-hidden">
-                <div
-                  className="flex transition-transform duration-500 ease-in-out"
-                  style={{ transform: `translateX(-${adIndex * 100}%)` }}
-                >
-                  {ads.map((ad, i) => (
-                    <div
-                      key={i}
-                      className="w-full flex-shrink-0 relative bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 p-6 min-h-[120px] flex flex-col items-center justify-center text-center"
-                    >
-                      {/* Background pattern */}
-                      <div
-                        className="absolute inset-0 opacity-10"
-                        style={{
-                          backgroundImage: `radial-gradient(circle at 20% 50%, white 1px, transparent 1px),
-                radial-gradient(circle at 80% 20%, white 1px, transparent 1px)`,
-                          backgroundSize: "30px 30px",
-                        }}
-                      />
-                      <p className="relative text-xs font-bold uppercase tracking-widest text-white/70 mb-1">
-                        Advertisement
-                      </p>
-                      <h3 className="relative text-xl font-black text-white mb-1">
-                        {ad}
-                      </h3>
-                      <p className="relative text-xs text-white/80">
-                        Tap to learn more about this offer
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Dot indicators */}
-              <div className="flex items-center justify-center gap-1.5 py-3">
-                {ads.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setAdIndex(i)}
-                    className={`rounded-full transition-all duration-300 ${
-                      i === adIndex
-                        ? "w-4 h-1.5 bg-amber-500"
-                        : "w-1.5 h-1.5 bg-slate-200 hover:bg-slate-300"
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Right Section - Reviews */}
-          {/* Right Section - Reviews */}
-          <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm border border-slate-100 lg:sticky lg:top-24 h-fit">
-            {/* Average Rating Summary */}
-            <div className="flex items-center gap-3 mb-3">
-              <div className="text-4xl font-black text-slate-900">
-                {averageRating.toFixed(1)}
-              </div>
-              <div>
-                <div className="flex gap-0.5 mb-0.5">
-                  {renderRatingStars(averageRating, "text-sm")}
+          {/* Share Modal */}
+          {isShareOpen && (
+            <div
+              className="fixed inset-0 z-[1002] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+              onClick={() => setIsShareOpen(false)}
+            >
+              <div
+                className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                  <h2 className="text-base font-black text-slate-900">Share</h2>
+                  <button
+                    onClick={() => setIsShareOpen(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200"
+                  >
+                    <i className="pi pi-times text-sm" />
+                  </button>
                 </div>
-                <p className="text-xs text-slate-500">
-                  {reviews.length} reviews
-                </p>
+
+                {/* Share Options */}
+                <div className="px-2 py-2 divide-y divide-slate-100">
+                  {/* Facebook */}
+
+                  <a
+                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-4 px-3 py-3 rounded-xl transition hover:bg-slate-50"
+                    onClick={() => setIsShareOpen(false)}
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1877F2]">
+                      <svg viewBox="0 0 24 24" fill="white" className="h-5 w-5">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-semibold text-slate-800">
+                      Facebook
+                    </span>
+                  </a>
+
+                  {/* WhatsApp */}
+
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(`Check out ${store.storeName} on AMP Shopping!\n${window.location.href}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-4 px-3 py-3 rounded-xl transition hover:bg-slate-50"
+                    onClick={() => setIsShareOpen(false)}
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#25D366]">
+                      <svg viewBox="0 0 24 24" fill="white" className="h-5 w-5">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-semibold text-slate-800">
+                      WhatsApp
+                    </span>
+                  </a>
+
+                  {/* X (Twitter) */}
+
+                  <a
+                    href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out ${store.storeName} on AMP Shopping!`)}&url=${encodeURIComponent(window.location.href)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-4 px-3 py-3 rounded-xl transition hover:bg-slate-50"
+                    onClick={() => setIsShareOpen(false)}
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black">
+                      <svg viewBox="0 0 24 24" fill="white" className="h-5 w-5">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-semibold text-slate-800">
+                      X
+                    </span>
+                  </a>
+                </div>
+
+                {/* Copy Link */}
+                <div className="px-5 pb-5 pt-2">
+                  <p className="text-xs text-slate-400 mb-2">
+                    Click to copy link
+                  </p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 transition hover:bg-slate-100"
+                  >
+                    <span className="flex-1 truncate text-left text-xs text-slate-600">
+                      {window.location.href}
+                    </span>
+                    <span
+                      className={`shrink-0 text-xs font-bold transition ${copied ? "text-emerald-500" : "text-blue-500"}`}
+                    >
+                      {copied ? "Copied!" : "Copy"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Map Modal */}
+          {isMapOpen && store.lat && store.long && (
+            <div
+              className="fixed inset-0 z-[1002] flex items-center justify-center bg-black/70 px-4 py-6"
+              onClick={() => setIsMapOpen(false)}
+            >
+              <div
+                className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-blue-600">
+                      Store Location
+                    </p>
+                    <h2 className="mt-0.5 text-lg font-black text-slate-900">
+                      {store.storeName}
+                    </h2>
+                    {store.address?.area && (
+                      <p className="mt-0.5 text-xs text-slate-500 flex items-center gap-1">
+                        <i className="pi pi-map-marker text-slate-400 text-[10px]" />
+                        {store.address.area}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setIsMapOpen(false)}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+                  >
+                    <i className="pi pi-times text-lg" />
+                  </button>
+                </div>
+
+                {/* Google Maps Embed */}
+                <div className="relative h-[380px] w-full bg-slate-100">
+                  <iframe
+                    title={`Map for ${store.storeName}`}
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    allowFullScreen
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                      `${store.storeName}, ${store.address?.area || ""}, ${store.address?.state || ""}, India`,
+                    )}&hl=en&z=17&output=embed`}
+                  />
+                </div>
+
+                {/* Footer */}
+                <div className="flex gap-3 px-5 py-4 border-t border-slate-100">
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                      `${store.storeName}, ${store.address?.area || ""}, ${store.address?.state || ""}, India`,
+                    )}&destination_place_id=${store.lat},${store.long}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95"
+                  >
+                    <i className="pi pi-send text-sm" />
+                    Get Directions
+                  </a>
+
+                  <a
+                    href={`https://www.google.com/maps/search/${encodeURIComponent(
+                      `${store.storeName}, ${store.address?.area || ""}, ${store.address?.state || ""}, India`,
+                    )}/@${store.lat},${store.long},17z`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <i className="pi pi-external-link text-sm" />
+                    Open in Maps
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {authUser && (
+            <ReviewModal
+              isOpen={isReviewModalOpen}
+              onClose={() => {
+                setIsReviewModalOpen(false);
+                setReviewSubmitError(null);
+                setReviewSubmitSuccess(null);
+              }}
+              storeName={store.storeName}
+              onSubmit={handleSubmitReview}
+              submitting={reviewSubmitting}
+              submitError={reviewSubmitError}
+              submitSuccess={reviewSubmitSuccess}
+            />
+          )}
+
+          {isReviewsModalOpen && (
+            <div
+              className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 px-4 py-6"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="reviews-modal-title"
+              onClick={() => setIsReviewsModalOpen(false)}
+            >
+              <div
+                className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-amber-600">
+                      Customer reviews
+                    </p>
+                    <h2
+                      id="reviews-modal-title"
+                      className="mt-1 text-xl font-black text-slate-900"
+                    >
+                      All reviews
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {reviews.length} review{reviews.length === 1 ? "" : "s"}{" "}
+                      total
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsReviewsModalOpen(false)}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 hover:text-slate-900"
+                    aria-label="Close reviews modal"
+                  >
+                    <i className="pi pi-times text-lg" />
+                  </button>
+                </div>
+
+                <div className="max-h-[75vh] overflow-y-auto divide-y divide-slate-100">
+                  {reviews.length === 0 ? (
+                    <div className="px-5 py-10 text-center">
+                      <i className="pi pi-star text-3xl text-slate-200" />
+                      <p className="mt-3 text-sm text-slate-500">
+                        No reviews yet.
+                      </p>
+                    </div>
+                  ) : (
+                    reviews.map((review) => (
+                      <div
+                        key={review._id}
+                        className="flex items-start gap-2.5 px-4 py-2.5"
+                      >
+                        <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full mt-0.5">
+                          {review.userId.picture ? (
+                            <img
+                              src={review.userId.picture}
+                              alt={review.userId.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-xs font-bold text-white">
+                              {review.userId.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-xs font-bold text-slate-900 leading-none">
+                              {review.userId.name}
+                            </p>
+                            <p className="shrink-0 text-[10px] text-slate-400 leading-none">
+                              {formatReviewDate(review.createdAt)}
+                            </p>
+                          </div>
+                          <div className="flex gap-0.5 mt-[2px]">
+                            {renderRatingStars(review.rating, "text-[10px]")}
+                          </div>
+                          <p className="text-xs leading-snug text-slate-600 mt-[2px]">
+                            {review.comment}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ADS — full width, দুই column জুড়ে */}
+          {/* ADS SECTION — Dynamic */}
+          <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black text-slate-900">
+                  Featured Ads
+                </h2>
+                <span className="rounded-sm bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 uppercase tracking-wide">
+                  Sponsored
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => scrollAds("left")}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-amber-50 hover:border-amber-300 hover:text-amber-600"
+                >
+                  <i className="pi pi-arrow-left text-xs" />
+                </button>
+                <button
+                  onClick={() => scrollAds("right")}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-amber-50 hover:border-amber-300 hover:text-amber-600"
+                >
+                  <i className="pi pi-arrow-right text-xs" />
+                </button>
               </div>
             </div>
 
-            {/* Write a Review Button */}
-            {authUser && (
-              <button
-                onClick={() => {
-                  const el = document.getElementById("review-form");
-                  el?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-2 text-sm font-semibold text-slate-700 transition hover:border-amber-400 hover:bg-amber-50 hover:text-amber-700"
-              >
-                <i className="pi pi-pencil text-amber-500" />
-                Write a review
-              </button>
-            )}
+            <div className="relative">
+              <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-8 bg-gradient-to-r from-white to-transparent" />
+              <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-8 bg-gradient-to-l from-white to-transparent" />
 
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-              Reviews aren't verified
-            </p>
-
-            {/* Review List */}
-            {reviews.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6">
-                <i className="pi pi-star text-3xl text-slate-200 mb-2" />
-                <p className="text-xs text-slate-400 text-center">
-                  No reviews yet. Be the first!
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                {reviews.map((review) => (
-                  <div
-                    key={review._id}
-                    className="flex items-start gap-2.5 py-2 border-b border-slate-100 last:border-0"
-                  >
-                    {/* Avatar */}
-                    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full">
-                      {review.userId.picture ? (
-                        <img
-                          src={review.userId.picture}
-                          alt={review.userId.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-xs font-bold text-white">
-                          {review.userId.name.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Content */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <p className="text-xs font-bold text-slate-900 truncate">
-                          {review.userId.name}
-                        </p>
-                        <p className="text-[10px] text-slate-400 shrink-0">
-                          {formatReviewDate(review.createdAt)}
-                        </p>
-                      </div>
-                      <div className="flex gap-0.5 mb-1">
-                        {renderRatingStars(review.rating, "text-[10px]")}
-                      </div>
-                      <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
-                        {review.comment}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Add Review Form */}
-            {authUser && (
               <div
-                id="review-form"
-                className="mt-4 pt-4 border-t border-slate-200"
+                ref={adsScrollRef}
+                className="flex gap-0 overflow-x-auto scrollbar-hide divide-x divide-slate-100"
               >
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
-                  Share your feedback
-                </p>
-                <div className="mb-2 flex gap-1.5">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      onClick={() => setReviewRating(star)}
-                      className="text-base transition"
+                {adsLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="flex w-[170px] shrink-0 flex-col p-3 sm:w-[190px] animate-pulse"
                     >
-                      <i
-                        className={`pi pi-star-fill ${
-                          star <= reviewRating
-                            ? "text-amber-400"
-                            : "text-slate-200"
-                        }`}
-                      />
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  value={reviewComment}
-                  onChange={(e) => setReviewComment(e.target.value)}
-                  placeholder="Share your experience..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs resize-none focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-yellow-100"
-                  rows={3}
-                />
-                {reviewSubmitError && (
-                  <p className="mt-1.5 text-xs text-red-600 font-semibold">
-                    {reviewSubmitError}
-                  </p>
+                      <div className="mb-2.5 h-[140px] w-full rounded-lg bg-slate-100 sm:h-[155px]" />
+                      <div className="h-3 w-3/4 rounded-full bg-slate-100 mb-2" />
+                      <div className="h-3 w-1/2 rounded-full bg-slate-100 mb-1" />
+                      <div className="h-3 w-2/3 rounded-full bg-slate-100" />
+                    </div>
+                  ))
+                ) : ads.length === 0 ? (
+                  <div className="flex w-full items-center justify-center py-10 px-6 text-sm text-slate-400 gap-2">
+                    <i className="pi pi-megaphone text-slate-300 text-xl" />
+                    No sponsored ads available
+                  </div>
+                ) : (
+                  ads.map((ad) => {
+                    const hasValidUrl =
+                      !!ad.redirectUrl &&
+                      ad.redirectUrl !== "https://" &&
+                      ad.redirectUrl.startsWith("http");
+
+                    const inner = (
+                      <>
+                        <span className="absolute left-2 top-2 z-10 rounded-sm bg-white border border-slate-200 px-1 py-0.5 text-[9px] font-bold text-slate-400 leading-none">
+                          AD
+                        </span>
+
+                        {ad.rank && ad.rank <= 3 && (
+                          <span className="absolute right-2 top-2 z-10 rounded-sm bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-white leading-none">
+                            #{ad.rank} Top
+                          </span>
+                        )}
+
+                        <div className="relative mb-2.5 h-[140px] w-full overflow-hidden rounded-lg bg-slate-50 flex items-center justify-center sm:h-[155px]">
+                          {ad.image ? (
+                            <img
+                              src={ad.image}
+                              alt={ad.title}
+                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                              onError={(e: any) => {
+                                e.target.style.display = "none";
+                              }}
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100">
+                              <i className="pi pi-image text-3xl text-amber-300" />
+                            </div>
+                          )}
+                        </div>
+
+                        <p className="mb-1 text-xs font-bold text-slate-800 leading-tight line-clamp-2">
+                          {ad.title}
+                        </p>
+
+                        {ad.description && (
+                          <p className="text-[10px] text-slate-500 leading-tight line-clamp-2 mb-1">
+                            {ad.description}
+                          </p>
+                        )}
+
+                        {hasValidUrl && (
+                          <p className="mt-auto pt-2 text-[10px] font-semibold text-amber-600 flex items-center gap-1">
+                            Visit now{" "}
+                            <i className="pi pi-external-link text-[8px]" />
+                          </p>
+                        )}
+                      </>
+                    );
+
+                    const cls =
+                      "group relative flex w-[170px] shrink-0 flex-col p-3 transition hover:bg-slate-50 sm:w-[190px]";
+
+                    return hasValidUrl ? (
+                      <a
+                        key={ad._id}
+                        href={ad.redirectUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={cls}
+                      >
+                        {inner}
+                      </a>
+                    ) : (
+                      <div key={ad._id} className={cls}>
+                        {inner}
+                      </div>
+                    );
+                  })
                 )}
-                {reviewSubmitSuccess && (
-                  <p className="mt-1.5 text-xs text-emerald-600 font-semibold">
-                    {reviewSubmitSuccess}
-                  </p>
-                )}
-                <button
-                  onClick={handleSubmitReview}
-                  disabled={reviewSubmitting}
-                  className="mt-2 w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2 text-sm font-bold text-white shadow-sm transition hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {reviewSubmitting && (
-                    <i className="pi pi-spin pi-spinner text-sm" />
-                  )}
-                  {reviewSubmitting ? "Posting..." : "Post Review"}
-                </button>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </main>

@@ -97,6 +97,15 @@ const Sidebar: React.FC<SidebarProps> = ({ role, user }) => {
     {
       title: "Menu",
       items: [
+        ...(role === "ADMIN"
+          ? [
+              {
+                label: "Categories",
+                icon: "pi-tags",
+                href: "/dashboard/categories",
+              },
+            ]
+          : []),
         { label: "Products", icon: "pi-box", href: "/dashboard/products" },
         { label: "Store", icon: "pi-shop", href: "/dashboard/store" },
       ],
@@ -114,7 +123,11 @@ const Sidebar: React.FC<SidebarProps> = ({ role, user }) => {
     left: 0,
     height: isMobile ? "calc(100vh - 64px)" : "100vh",
     transition: "transform 0.28s ease, width 0.28s ease",
-    transform: isMobile ? (collapsed ? "translateX(-100%)" : "translateX(0)") : "none",
+    transform: isMobile
+      ? collapsed
+        ? "translateX(-100%)"
+        : "translateX(0)"
+      : "none",
     paddingTop: isMobile ? 12 : 20,
     overflowY: "auto",
     borderRight: "1px solid #efd992",
@@ -126,7 +139,9 @@ const Sidebar: React.FC<SidebarProps> = ({ role, user }) => {
     <nav style={sidebarStyle}>
       {/* HEADER */}
       <div style={{ padding: "0 20px", marginBottom: 20 }}>
-        {!collapsed && <h2 style={{ margin: 0, color: "#3b2e0e" }}>Amp Store</h2>}
+        {!collapsed && (
+          <h2 style={{ margin: 0, color: "#3b2e0e" }}>Amp Store</h2>
+        )}
       </div>
 
       {/* USER */}
@@ -135,12 +150,8 @@ const Sidebar: React.FC<SidebarProps> = ({ role, user }) => {
           <div style={{ display: "flex", gap: 10 }}>
             <Avatar image={user.image} shape="circle" />
             <div>
-              <div style={{ fontWeight: 600 }}>
-                {user.name}
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                {user.email}
-              </div>
+              <div style={{ fontWeight: 600 }}>{user.name}</div>
+              <div style={{ fontSize: 12, opacity: 0.7 }}>{user.email}</div>
             </div>
           </div>
         </div>
@@ -174,13 +185,17 @@ const Sidebar: React.FC<SidebarProps> = ({ role, user }) => {
                       background: active
                         ? "linear-gradient(90deg,#ffe186,#ffd45e)"
                         : "rgba(255,255,255,0.45)",
-                      border: active ? "1px solid #e8be45" : "1px solid #efd992",
+                      border: active
+                        ? "1px solid #e8be45"
+                        : "1px solid #efd992",
                       marginBottom: 8,
                       fontWeight: active ? 700 : 600,
                     }}
                   >
                     {item.icon && <i className={`pi ${item.icon}`} />}
-                    {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
+                    {!collapsed && (
+                      <span style={{ flex: 1 }}>{item.label}</span>
+                    )}
                   </Link>
                 </div>
               );

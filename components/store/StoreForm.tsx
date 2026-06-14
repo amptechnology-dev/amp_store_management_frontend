@@ -28,6 +28,17 @@ const timingByDaySchema = z.object({
   sunday: z.string().optional(),
 });
 
+type SubCategoryOption = {
+  _id: string;
+  name: string;
+};
+
+type CategoryOption = {
+  _id: string;
+  name: string;
+  subCategories: SubCategoryOption[];
+};
+
 const baseStoreFormSchema = z.object({
   name: z.string().optional(),
   email: z.string().optional(),
@@ -35,6 +46,8 @@ const baseStoreFormSchema = z.object({
   password: z.string().optional(),
   storeName: z.string().min(2, "Store name is required"),
   storeType: z.string().min(1, "Store type is required"),
+  categoryId: z.string().optional(),
+  subCategoryId: z.string().optional(),
   description: z.string().optional(),
   contactNo: z.string().min(10, "Contact number is required"),
   whatsappNo: z.string().min(10, "WhatsApp number is required"),
@@ -72,7 +85,11 @@ const getStoreFormSchema = (isEditMode: boolean, mode: "admin" | "store") =>
         path: ["email"],
         message: "Valid email is required",
       });
-    } else if (requireOwnerFields && values.email && !/^\S+@\S+\.\S+$/.test(values.email)) {
+    } else if (
+      requireOwnerFields &&
+      values.email &&
+      !/^\S+@\S+\.\S+$/.test(values.email)
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["email"],
@@ -103,7 +120,11 @@ const getStoreFormSchema = (isEditMode: boolean, mode: "admin" | "store") =>
       return;
     }
 
-    if (!isEditMode && requireOwnerFields && (values.password?.length || 0) < 6) {
+    if (
+      !isEditMode &&
+      requireOwnerFields &&
+      (values.password?.length || 0) < 6
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["password"],
@@ -160,39 +181,75 @@ const getStoreTypeIcon = (label: string) => {
     return "pi pi-shopping-bag";
   }
 
-  if (/clothing|boutique|fashion|footwear|accessor|jewell|cosmetic|beauty|optical|supplement|tailor/.test(normalized)) {
+  if (
+    /clothing|boutique|fashion|footwear|accessor|jewell|cosmetic|beauty|optical|supplement|tailor/.test(
+      normalized,
+    )
+  ) {
     return "pi pi-shopping-bag";
   }
 
-  if (/electronics|appliance|it services|software|digital marketing|design studio|mobile/.test(normalized)) {
+  if (
+    /electronics|appliance|it services|software|digital marketing|design studio|mobile/.test(
+      normalized,
+    )
+  ) {
     return "pi pi-desktop";
   }
 
-  if (/furniture|home decor|interior|real estate|property|construction|building materials|hardware|paint|tiles|plumbing|cement|steel/.test(normalized)) {
+  if (
+    /furniture|home decor|interior|real estate|property|construction|building materials|hardware|paint|tiles|plumbing|cement|steel/.test(
+      normalized,
+    )
+  ) {
     return "pi pi-home";
   }
 
-  if (/restaurant|café|cafe|bakery|sweet|ice cream|fast food|food truck|cloud kitchen|catering|juice|meat|fruits|vegetables|bar|hotel|resort/.test(normalized)) {
+  if (
+    /restaurant|café|cafe|bakery|sweet|ice cream|fast food|food truck|cloud kitchen|catering|juice|meat|fruits|vegetables|bar|hotel|resort/.test(
+      normalized,
+    )
+  ) {
     return "pi pi-star";
   }
 
-  if (/car|vehicle|tyre|battery|garage|wash|transport|courier|logistics|delivery|warehouse/.test(normalized)) {
+  if (
+    /car|vehicle|tyre|battery|garage|wash|transport|courier|logistics|delivery|warehouse/.test(
+      normalized,
+    )
+  ) {
     return "pi pi-truck";
   }
 
-  if (/medical|clinic|dental|lab|hospital|physio|gym|spa|optician|health|pharmacy/.test(normalized)) {
+  if (
+    /medical|clinic|dental|lab|hospital|physio|gym|spa|optician|health|pharmacy/.test(
+      normalized,
+    )
+  ) {
     return "pi pi-heart";
   }
 
-  if (/accounting|legal|marketing|consultancy|agency|business|insurance|bank|finance|crypto|microfinance|stock|mutual fund|recruitment|hr|event management/.test(normalized)) {
+  if (
+    /accounting|legal|marketing|consultancy|agency|business|insurance|bank|finance|crypto|microfinance|stock|mutual fund|recruitment|hr|event management/.test(
+      normalized,
+    )
+  ) {
     return "pi pi-briefcase";
   }
 
-  if (/school|college|coaching|training|academy|language|daycare|edtech|music|film|photography|gaming|publishing/.test(normalized)) {
+  if (
+    /school|college|coaching|training|academy|language|daycare|edtech|music|film|photography|gaming|publishing/.test(
+      normalized,
+    )
+  ) {
     return "pi pi-book";
   }
 
-  if (/cleaning|pest control|painting|renovation|repair|gardening|laundry|security|import export|factory|manufacturing/.test(normalized)) {
+  if (
+    /cleaning|pest control|painting|renovation|repair|gardening|laundry|security|import export|factory|manufacturing/.test(
+      normalized,
+    )
+  ) {
     return "pi pi-cog";
   }
 
@@ -323,12 +380,12 @@ const INDIA_CENTER = {
 };
 
 const STATE_CENTERS: Record<string, [number, number]> = {
-  "Andhra Pradesh": [15.9129, 79.7400],
-  "Arunachal Pradesh": [28.2180, 94.7278],
+  "Andhra Pradesh": [15.9129, 79.74],
+  "Arunachal Pradesh": [28.218, 94.7278],
   Assam: [26.2006, 92.9376],
   Bihar: [25.0961, 85.3131],
   Chhattisgarh: [21.2787, 81.8661],
-  Goa: [15.2993, 74.1240],
+  Goa: [15.2993, 74.124],
   Gujarat: [22.2587, 71.1924],
   Haryana: [29.0588, 76.0856],
   "Himachal Pradesh": [31.1048, 77.1734],
@@ -338,19 +395,19 @@ const STATE_CENTERS: Record<string, [number, number]> = {
   "Madhya Pradesh": [22.9734, 78.6569],
   Maharashtra: [19.7515, 75.7139],
   Manipur: [24.6637, 93.9063],
-  Meghalaya: [25.4670, 91.3662],
+  Meghalaya: [25.467, 91.3662],
   Mizoram: [23.1645, 92.9376],
   Nagaland: [26.1584, 94.5624],
   Odisha: [20.9517, 85.0985],
   Punjab: [31.1471, 75.3412],
   Rajasthan: [27.0238, 74.2179],
-  Sikkim: [27.5330, 88.5122],
+  Sikkim: [27.533, 88.5122],
   "Tamil Nadu": [11.1271, 78.6569],
   Telangana: [18.1124, 79.0193],
   Tripura: [23.9408, 91.9882],
   "Uttar Pradesh": [26.8467, 80.9462],
   Uttarakhand: [30.0668, 79.0193],
-  "West Bengal": [22.9868, 87.8550],
+  "West Bengal": [22.9868, 87.855],
   "Andaman and Nicobar Islands": [11.7401, 92.6586],
   Chandigarh: [30.7333, 76.7794],
   "Dadra and Nagar Haveli and Daman and Diu": [20.3974, 72.8328],
@@ -383,7 +440,9 @@ function StoreForm({
   const [isVerify, setIsVerify] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(false);
   const [locationQuery, setLocationQuery] = useState("");
-  const [locationResults, setLocationResults] = useState<LocationSearchResult[]>([]);
+  const [locationResults, setLocationResults] = useState<
+    LocationSearchResult[]
+  >([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [selectedLocationLabel, setSelectedLocationLabel] = useState("");
   const canShowVerifyField = profile?.role === "ADMIN";
@@ -391,6 +450,9 @@ function StoreForm({
   const isEditMode = !!storeId;
   const isStoreMode = mode === "store" && !isEditMode;
   const storeFormSchema = getStoreFormSchema(isEditMode, mode);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+const [subCategories, setSubCategories] = useState<SubCategoryOption[]>([]);
+const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   const {
     register,
@@ -409,6 +471,8 @@ function StoreForm({
       password: "",
       storeName: "",
       storeType: "",
+      categoryId: "",
+      subCategoryId: "",
       description: "",
       contactNo: "",
       whatsappNo: "",
@@ -434,12 +498,22 @@ function StoreForm({
     }
   }, [storeId]);
 
+  useEffect(() => {
+  fetchCategories();
+  if (storeId && isEditMode) {
+    fetchStoreData();
+  }
+}, [storeId]);
+
   const selectedLat = watch("lat");
   const selectedLong = watch("long");
   const selectedArea = watch("area");
   const selectedState = watch("state");
   const selectedCountry = watch("country") || "India";
-  const mapCenter = STATE_CENTERS[selectedState] || [INDIA_CENTER.latitude, INDIA_CENTER.longitude];
+  const mapCenter = STATE_CENTERS[selectedState] || [
+    INDIA_CENTER.latitude,
+    INDIA_CENTER.longitude,
+  ];
   const storeTypeOptions: StoreTypeOption[] = storeTypeList.map((option) => ({
     label: option.label,
     value: option.label,
@@ -470,8 +544,13 @@ function StoreForm({
     );
   };
 
-  const formatDetailedLocation = (address: Record<string, string | undefined>, fallback: string) => {
-    const street = [address.house_number, address.road].filter(Boolean).join(" ");
+  const formatDetailedLocation = (
+    address: Record<string, string | undefined>,
+    fallback: string,
+  ) => {
+    const street = [address.house_number, address.road]
+      .filter(Boolean)
+      .join(" ");
     const locality = [
       address.suburb,
       address.neighbourhood,
@@ -484,110 +563,148 @@ function StoreForm({
       .filter(Boolean)
       .join(", ");
 
-    return [street, locality, address.state, address.country].filter(Boolean).join(", ") || fallback;
+    return (
+      [street, locality, address.state, address.country]
+        .filter(Boolean)
+        .join(", ") || fallback
+    );
   };
 
-  const applyLocationResult = (result: LocationSearchResult) => {
-  const latitude = Number(result.lat);
-  const longitude = Number(result.lon);
-  const address = result.address || {};
-
-  // Area field এ clean, short address রাখো
-  const road = [address.house_number, address.road].filter(Boolean).join(" ");
-  const locality =
-    address.suburb ||
-    address.neighbourhood ||
-    address.city_district ||
-    address.city ||
-    address.town ||
-    address.village ||
-    "";
-  const pincode = address.postcode || "";
-
-  const areaValue = [road, locality, pincode].filter(Boolean).join(", ") || result.display_name;
-
-  const stateName =
-    address.state ||
-    address.state_district ||
-    selectedState ||
-    "";
-  const countryName = address.country || "India";
-
-  setValue("lat", latitude, { shouldDirty: true, shouldValidate: true });
-  setValue("long", longitude, { shouldDirty: true, shouldValidate: true });
-  setValue("area", areaValue, { shouldDirty: true, shouldValidate: true });
-
-  if (stateName) {
-    // INDIAN_STATES list এ exact match খোঁজো
-    const matchedState = INDIAN_STATES.find(
-      (s) => s.toLowerCase() === stateName.toLowerCase()
-    );
-    setValue("state", matchedState || stateName, { shouldDirty: true, shouldValidate: true });
+  const fetchCategories = async () => {
+  try {
+    setCategoriesLoading(true);
+    const res = await axiosInstance.get("/api/category");
+    setCategories(res.data.categories || []);
+  } catch {
+    toast.error("Failed to load categories");
+  } finally {
+    setCategoriesLoading(false);
   }
-
-  setValue("country", countryName, { shouldDirty: true, shouldValidate: true });
-  setLocationQuery(areaValue);
-  setSelectedLocationLabel(areaValue);
-  setLocationResults([]);
 };
 
-  const searchDetailedLocation = async () => {
-  const query = locationQuery.trim();
-
-  if (!query) {
-    toast.error("Enter a street, landmark, or locality to search.");
-    return;
-  }
-
-  setIsSearchingLocation(true);
-  setLocationResults([]);
-
+const fetchSubCategories = async (categoryId: string) => {
   try {
-    // Strategy 1: Direct query with India restriction
-    let results: LocationSearchResult[] = [];
+    const res = await axiosInstance.get(`/api/category/${categoryId}`);
+    setSubCategories(res.data.category?.subCategories || []);
+  } catch {
+    toast.error("Failed to load subcategories");
+  }
+};
 
-    const attempt = async (q: string) => {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=8&countrycodes=in&q=${encodeURIComponent(q)}`,
-        { headers: { Accept: "application/json", "Accept-Language": "en" } }
+  const applyLocationResult = (result: LocationSearchResult) => {
+    const latitude = Number(result.lat);
+    const longitude = Number(result.lon);
+    const address = result.address || {};
+
+    // Area field এ clean, short address রাখো
+    const road = [address.house_number, address.road].filter(Boolean).join(" ");
+    const locality =
+      address.suburb ||
+      address.neighbourhood ||
+      address.city_district ||
+      address.city ||
+      address.town ||
+      address.village ||
+      "";
+    const pincode = address.postcode || "";
+
+    const areaValue =
+      [road, locality, pincode].filter(Boolean).join(", ") ||
+      result.display_name;
+
+    const stateName =
+      address.state || address.state_district || selectedState || "";
+    const countryName = address.country || "India";
+
+    setValue("lat", latitude, { shouldDirty: true, shouldValidate: true });
+    setValue("long", longitude, { shouldDirty: true, shouldValidate: true });
+    setValue("area", areaValue, { shouldDirty: true, shouldValidate: true });
+
+    if (stateName) {
+      // INDIAN_STATES list এ exact match খোঁজো
+      const matchedState = INDIAN_STATES.find(
+        (s) => s.toLowerCase() === stateName.toLowerCase(),
       );
-      if (!res.ok) throw new Error("Search failed");
-      return (await res.json()) as LocationSearchResult[];
-    };
-
-    // Attempt 1: exact query as typed
-    results = await attempt(query);
-
-    // Attempt 2: যদি result না আসে, শেষের comma-separated part গুলো দিয়ে retry
-    if (results.length === 0) {
-      const parts = query.split(",").map((p) => p.trim()).filter(Boolean);
-      // পিছন থেকে একটা করে কমাও — e.g. "33/A, Belghoria, Kolkata"
-      for (let i = 1; i < parts.length && results.length === 0; i++) {
-        const shorterQuery = parts.slice(i).join(", ");
-        results = await attempt(shorterQuery);
-      }
+      setValue("state", matchedState || stateName, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
     }
 
-    // Attempt 3: শুধু প্রথম দুটো part
-    if (results.length === 0) {
-      const parts = query.split(",").map((p) => p.trim()).filter(Boolean);
-      if (parts.length >= 2) {
-        results = await attempt(parts.slice(0, 2).join(", "));
-      }
-    }
+    setValue("country", countryName, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    setLocationQuery(areaValue);
+    setSelectedLocationLabel(areaValue);
+    setLocationResults([]);
+  };
 
-    if (results.length === 0) {
-      toast.info("No results found. Try shorter address like 'Belghoria, Kolkata'");
+  const searchDetailedLocation = async () => {
+    const query = locationQuery.trim();
+
+    if (!query) {
+      toast.error("Enter a street, landmark, or locality to search.");
       return;
     }
 
-    setLocationResults(results);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to search locations");
-  } finally {
-    setIsSearchingLocation(false);
-  }
-};
+    setIsSearchingLocation(true);
+    setLocationResults([]);
+
+    try {
+      // Strategy 1: Direct query with India restriction
+      let results: LocationSearchResult[] = [];
+
+      const attempt = async (q: string) => {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=8&countrycodes=in&q=${encodeURIComponent(q)}`,
+          { headers: { Accept: "application/json", "Accept-Language": "en" } },
+        );
+        if (!res.ok) throw new Error("Search failed");
+        return (await res.json()) as LocationSearchResult[];
+      };
+
+      // Attempt 1: exact query as typed
+      results = await attempt(query);
+
+      // Attempt 2: যদি result না আসে, শেষের comma-separated part গুলো দিয়ে retry
+      if (results.length === 0) {
+        const parts = query
+          .split(",")
+          .map((p) => p.trim())
+          .filter(Boolean);
+        // পিছন থেকে একটা করে কমাও — e.g. "33/A, Belghoria, Kolkata"
+        for (let i = 1; i < parts.length && results.length === 0; i++) {
+          const shorterQuery = parts.slice(i).join(", ");
+          results = await attempt(shorterQuery);
+        }
+      }
+
+      // Attempt 3: শুধু প্রথম দুটো part
+      if (results.length === 0) {
+        const parts = query
+          .split(",")
+          .map((p) => p.trim())
+          .filter(Boolean);
+        if (parts.length >= 2) {
+          results = await attempt(parts.slice(0, 2).join(", "));
+        }
+      }
+
+      if (results.length === 0) {
+        toast.info(
+          "No results found. Try shorter address like 'Belghoria, Kolkata'",
+        );
+        return;
+      }
+
+      setLocationResults(results);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to search locations");
+    } finally {
+      setIsSearchingLocation(false);
+    }
+  };
 
   const setLocationFromMap = async (latitude: number, longitude: number) => {
     setValue("lat", latitude, { shouldDirty: true, shouldValidate: true });
@@ -597,7 +714,7 @@ function StoreForm({
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1`,
-        { headers: { Accept: "application/json" } }
+        { headers: { Accept: "application/json" } },
       );
 
       if (!response.ok) {
@@ -605,17 +722,37 @@ function StoreForm({
       }
 
       const result = await response.json();
-      const address = (result?.address || {}) as Record<string, string | undefined>;
-      const detailedLocation = formatDetailedLocation(address, result?.display_name || selectedArea || "");
+      const address = (result?.address || {}) as Record<
+        string,
+        string | undefined
+      >;
+      const detailedLocation = formatDetailedLocation(
+        address,
+        result?.display_name || selectedArea || "",
+      );
 
-      const stateName = address.state || address.region || address.state_district || selectedState || "";
+      const stateName =
+        address.state ||
+        address.region ||
+        address.state_district ||
+        selectedState ||
+        "";
       const countryName = address.country || selectedCountry || "India";
 
-      setValue("area", detailedLocation, { shouldDirty: true, shouldValidate: true });
+      setValue("area", detailedLocation, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
       if (stateName) {
-        setValue("state", stateName, { shouldDirty: true, shouldValidate: true });
+        setValue("state", stateName, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       }
-      setValue("country", countryName, { shouldDirty: true, shouldValidate: true });
+      setValue("country", countryName, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
       setLocationQuery(detailedLocation);
       setSelectedLocationLabel(detailedLocation);
     } catch (error: any) {
@@ -629,7 +766,7 @@ function StoreForm({
     try {
       setLoading(true);
       const res = await axiosInstance.get(
-        `/api/register/single-store/${storeId}`
+        `/api/register/single-store/${storeId}`,
       );
       const store = res.data.store;
 
@@ -644,6 +781,13 @@ function StoreForm({
       setValue("whatsappNo", store.whatsappNo?.trim() || "");
       setValue("website", store.website?.trim() || "");
       setValue("gstin", store.gstin?.trim() || "");
+      if (store.categoryId) {
+  setValue("categoryId", store.categoryId);
+  await fetchSubCategories(store.categoryId);
+}
+if (store.subCategoryId) {
+  setValue("subCategoryId", store.subCategoryId);
+}
       setValue("lat", store.lat || 0);
       setValue("long", store.long || 0);
       setValue("area", store.address?.area?.trim() || "");
@@ -667,9 +811,11 @@ function StoreForm({
       if (store.timingByDay && Object.keys(store.timingByDay).length > 0) {
         // Cast to a known record shape so TS knows the entry value is string | undefined
         setTimingRows(
-          Object.entries(store.timingByDay as Record<string, string | undefined>)
+          Object.entries(
+            store.timingByDay as Record<string, string | undefined>,
+          )
             .filter(([, timing]) => Boolean(timing))
-            .map(([day, timing]) => createTimingRow(day, timing ?? ""))
+            .map(([day, timing]) => createTimingRow(day, timing ?? "")),
         );
       } else {
         setTimingRows([]);
@@ -691,7 +837,9 @@ function StoreForm({
 
       setLoading(false);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to fetch store data");
+      toast.error(
+        error.response?.data?.message || "Failed to fetch store data",
+      );
       onClose();
     }
   };
@@ -741,9 +889,13 @@ function StoreForm({
     setTimingRows((prev) => [...prev, createTimingRow("", generalTiming)]);
   };
 
-  const updateTimingRow = (id: string, field: "day" | "timing", value: string) => {
+  const updateTimingRow = (
+    id: string,
+    field: "day" | "timing",
+    value: string,
+  ) => {
     setTimingRows((prev) =>
-      prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
+      prev.map((row) => (row.id === id ? { ...row, [field]: value } : row)),
     );
   };
 
@@ -751,7 +903,10 @@ function StoreForm({
     setTimingRows((prev) => prev.filter((row) => row.id !== id));
   };
 
-  const handleGeneralTimingChange = (field: "open" | "close", value: string) => {
+  const handleGeneralTimingChange = (
+    field: "open" | "close",
+    value: string,
+  ) => {
     if (field === "open") {
       setTimingOpen(value);
     } else {
@@ -775,6 +930,8 @@ function StoreForm({
       }
       formData.append("storeName", data.storeName || "");
       formData.append("storeType", data.storeType || "");
+      if (data.categoryId) formData.append("categoryId", data.categoryId);
+if (data.subCategoryId) formData.append("subCategoryId", data.subCategoryId);
       formData.append("description", data.description || "");
       formData.append("contactNo", data.contactNo || "");
       formData.append("whatsappNo", data.whatsappNo || "");
@@ -832,21 +989,20 @@ function StoreForm({
             headers: {
               "Content-Type": "multipart/form-data",
             },
-          }
+          },
         );
       } else {
-        res = await axiosInstance.post(
-          createEndpoint,
-          formData,
-          {
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
-          }
-        );
+        res = await axiosInstance.post(createEndpoint, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
       }
 
-      toast.success(res.data.message || `Store ${isEditMode ? "updated" : "created"} successfully!`);
+      toast.success(
+        res.data.message ||
+          `Store ${isEditMode ? "updated" : "created"} successfully!`,
+      );
       reset();
       setImageFiles([]);
       setImagePreviews([]);
@@ -867,7 +1023,10 @@ function StoreForm({
   if (loading) {
     return (
       <div className="flex justify-center items-center p-4">
-        <i className="pi pi-spin pi-spinner text-3xl" style={{ color: "#d89f00" }}></i>
+        <i
+          className="pi pi-spin pi-spinner text-3xl"
+          style={{ color: "#d89f00" }}
+        ></i>
       </div>
     );
   }
@@ -891,11 +1050,16 @@ function StoreForm({
                   {...register("name")}
                   placeholder="Enter owner name"
                   onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                    e.currentTarget.value = e.currentTarget.value.replace(/\d/g, "");
+                    e.currentTarget.value = e.currentTarget.value.replace(
+                      /\d/g,
+                      "",
+                    );
                   }}
                   className={`w-full p-2 border rounded-lg ${errors.name ? "border-red-500" : "border-yellow-300"}`}
                 />
-                {errors.name && <small className="text-red-500">{errors.name.message}</small>}
+                {errors.name && (
+                  <small className="text-red-500">{errors.name.message}</small>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -908,7 +1072,9 @@ function StoreForm({
                   placeholder="Enter email"
                   className={`w-full p-2 border rounded-lg ${errors.email ? "border-red-500" : "border-yellow-300"}`}
                 />
-                {errors.email && <small className="text-red-500">{errors.email.message}</small>}
+                {errors.email && (
+                  <small className="text-red-500">{errors.email.message}</small>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -920,16 +1086,22 @@ function StoreForm({
                   placeholder="Enter phone"
                   inputMode="numeric"
                   onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                    e.currentTarget.value = e.currentTarget.value.replace(/\D/g, "");
+                    e.currentTarget.value = e.currentTarget.value.replace(
+                      /\D/g,
+                      "",
+                    );
                   }}
                   className={`w-full p-2 border rounded-lg ${errors.phone ? "border-red-500" : "border-yellow-300"}`}
                 />
-                {errors.phone && <small className="text-red-500">{errors.phone.message}</small>}
+                {errors.phone && (
+                  <small className="text-red-500">{errors.phone.message}</small>
+                )}
               </div>
 
               <div className="space-y-1">
                 <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-                  Password {!isEditMode && <span className="text-red-500">*</span>}
+                  Password{" "}
+                  {!isEditMode && <span className="text-red-500">*</span>}
                 </label>
                 <InputText
                   {...register("password")}
@@ -937,7 +1109,11 @@ function StoreForm({
                   placeholder="Enter password"
                   className={`w-full p-2 border rounded-lg ${errors.password ? "border-red-500" : "border-yellow-300"}`}
                 />
-                {errors.password && <small className="text-red-500">{errors.password.message}</small>}
+                {errors.password && (
+                  <small className="text-red-500">
+                    {errors.password.message}
+                  </small>
+                )}
               </div>
             </div>
           </div>
@@ -960,7 +1136,11 @@ function StoreForm({
                 placeholder="Enter store name"
                 className={`w-full p-2 border rounded-lg ${errors.storeName ? "border-red-500" : "border-yellow-300"}`}
               />
-              {errors.storeName && <small className="text-red-500">{errors.storeName.message}</small>}
+              {errors.storeName && (
+                <small className="text-red-500">
+                  {errors.storeName.message}
+                </small>
+              )}
             </div>
 
             <div className="space-y-1">
@@ -985,7 +1165,11 @@ function StoreForm({
                   />
                 )}
               />
-              {errors.storeType && <small className="text-red-500">{errors.storeType.message}</small>}
+              {errors.storeType && (
+                <small className="text-red-500">
+                  {errors.storeType.message}
+                </small>
+              )}
             </div>
 
             <div className="space-y-1">
@@ -997,11 +1181,18 @@ function StoreForm({
                 placeholder="Enter contact number"
                 inputMode="numeric"
                 onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                  e.currentTarget.value = e.currentTarget.value.replace(/\D/g, "");
+                  e.currentTarget.value = e.currentTarget.value.replace(
+                    /\D/g,
+                    "",
+                  );
                 }}
                 className={`w-full p-2 border rounded-lg ${errors.contactNo ? "border-red-500" : "border-yellow-300"}`}
               />
-              {errors.contactNo && <small className="text-red-500">{errors.contactNo.message}</small>}
+              {errors.contactNo && (
+                <small className="text-red-500">
+                  {errors.contactNo.message}
+                </small>
+              )}
             </div>
 
             <div className="space-y-1">
@@ -1013,25 +1204,87 @@ function StoreForm({
                 placeholder="Enter WhatsApp number"
                 inputMode="numeric"
                 onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                  e.currentTarget.value = e.currentTarget.value.replace(/\D/g, "");
+                  e.currentTarget.value = e.currentTarget.value.replace(
+                    /\D/g,
+                    "",
+                  );
                 }}
                 className={`w-full p-2 border rounded-lg ${errors.whatsappNo ? "border-red-500" : "border-yellow-300"}`}
               />
-              {errors.whatsappNo && <small className="text-red-500">{errors.whatsappNo.message}</small>}
+              {errors.whatsappNo && (
+                <small className="text-red-500">
+                  {errors.whatsappNo.message}
+                </small>
+              )}
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">Website</label>
+              <label className="text-sm font-semibold text-gray-700">
+                Website
+              </label>
               <InputText
                 {...register("website")}
                 placeholder="Enter website URL"
                 className={`w-full p-2 border rounded-lg ${errors.website ? "border-red-500" : "border-yellow-300"}`}
               />
-              {errors.website && <small className="text-red-500">{errors.website.message}</small>}
+              {errors.website && (
+                <small className="text-red-500">{errors.website.message}</small>
+              )}
             </div>
 
+            <div className="space-y-1">
+  <label className="text-sm font-semibold text-gray-700">Category</label>
+  <Controller
+    name="categoryId"
+    control={control}
+    render={({ field }) => (
+      <Dropdown
+        value={field.value}
+        onChange={async (e) => {
+          field.onChange(e.value);
+          setValue("subCategoryId", "");
+          setSubCategories([]);
+          if (e.value) await fetchSubCategories(e.value);
+        }}
+        options={categories.map((c) => ({ label: c.name, value: c._id }))}
+        placeholder={categoriesLoading ? "Loading..." : "Select category"}
+        disabled={categoriesLoading}
+        className="w-full border-yellow-300"
+        panelClassName="!text-sm"
+      />
+    )}
+  />
+</div>
+
+<div className="space-y-1">
+  <label className="text-sm font-semibold text-gray-700">Sub Category</label>
+  <Controller
+    name="subCategoryId"
+    control={control}
+    render={({ field }) => (
+      <Dropdown
+        value={field.value}
+        onChange={(e) => field.onChange(e.value)}
+        options={subCategories.map((s) => ({ label: s.name, value: s._id }))}
+        placeholder={
+          !watch("categoryId")
+            ? "Select category first"
+            : subCategories.length === 0
+            ? "No subcategories"
+            : "Select subcategory"
+        }
+        disabled={!watch("categoryId") || subCategories.length === 0}
+        className="w-full border-yellow-300"
+        panelClassName="!text-sm"
+      />
+    )}
+  />
+</div>
+
             <div className="space-y-1 md:col-span-2">
-              <label className="text-sm font-semibold text-gray-700">Description</label>
+              <label className="text-sm font-semibold text-gray-700">
+                Description
+              </label>
               <InputTextarea
                 {...register("description")}
                 placeholder="Enter store description"
@@ -1051,7 +1304,9 @@ function StoreForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">Country</label>
+              <label className="text-sm font-semibold text-gray-700">
+                Country
+              </label>
               <Controller
                 name="country"
                 control={control}
@@ -1063,11 +1318,15 @@ function StoreForm({
                   />
                 )}
               />
-              {errors.country && <small className="text-red-500">{errors.country.message}</small>}
+              {errors.country && (
+                <small className="text-red-500">{errors.country.message}</small>
+              )}
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">State</label>
+              <label className="text-sm font-semibold text-gray-700">
+                State
+              </label>
               <Controller
                 name="state"
                 control={control}
@@ -1075,14 +1334,19 @@ function StoreForm({
                   <Dropdown
                     value={field.value}
                     onChange={(e) => field.onChange(e.value)}
-                    options={INDIAN_STATES.map((stateName) => ({ label: stateName, value: stateName }))}
+                    options={INDIAN_STATES.map((stateName) => ({
+                      label: stateName,
+                      value: stateName,
+                    }))}
                     placeholder="Select state"
                     className={`w-full ${errors.state ? "border-red-500" : "border-yellow-300"}`}
                     panelClassName="!text-sm"
                   />
                 )}
               />
-              {errors.state && <small className="text-red-500">{errors.state.message}</small>}
+              {errors.state && (
+                <small className="text-red-500">{errors.state.message}</small>
+              )}
             </div>
 
             <div className="space-y-2 md:col-span-2">
@@ -1092,7 +1356,8 @@ function StoreForm({
                     Detailed Location <span className="text-red-500">*</span>
                   </label>
                   <p className="text-xs text-gray-500 mt-1">
-                    Search by street, house number, landmark, or locality. The selected state narrows the results.
+                    Search by street, house number, landmark, or locality. The
+                    selected state narrows the results.
                   </p>
                 </div>
                 <div className="text-xs text-gray-500 text-right">
@@ -1122,7 +1387,11 @@ function StoreForm({
                       <Button
                         type="button"
                         label={isSearchingLocation ? "Searching..." : "Search"}
-                        icon={isSearchingLocation ? "pi pi-spin pi-spinner" : "pi pi-search"}
+                        icon={
+                          isSearchingLocation
+                            ? "pi pi-spin pi-spinner"
+                            : "pi pi-search"
+                        }
                         onClick={searchDetailedLocation}
                         className="!bg-yellow-400 !text-gray-900 !border-yellow-500 md:!w-40"
                         disabled={isSearchingLocation}
@@ -1132,12 +1401,20 @@ function StoreForm({
                     {locationResults.length > 0 && (
                       <div className="rounded-2xl border border-yellow-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.08)] overflow-hidden">
                         <div className="px-4 py-3 border-b border-yellow-100 bg-yellow-50/70">
-                          <p className="text-sm font-semibold text-gray-800 m-0">Select the exact place</p>
-                          <p className="text-xs text-gray-500 mt-1 m-0">Pick the matching street-level result to place the map pin precisely.</p>
+                          <p className="text-sm font-semibold text-gray-800 m-0">
+                            Select the exact place
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1 m-0">
+                            Pick the matching street-level result to place the
+                            map pin precisely.
+                          </p>
                         </div>
                         <div className="max-h-56 overflow-auto divide-y divide-yellow-100">
                           {locationResults.map((result, index) => {
-                            const itemLabel = formatDetailedLocation(result.address || {}, result.display_name);
+                            const itemLabel = formatDetailedLocation(
+                              result.address || {},
+                              result.display_name,
+                            );
 
                             return (
                               <button
@@ -1151,9 +1428,12 @@ function StoreForm({
                                     <i className="pi pi-map-marker" />
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-semibold text-gray-800 leading-6 truncate">{itemLabel}</div>
+                                    <div className="text-sm font-semibold text-gray-800 leading-6 truncate">
+                                      {itemLabel}
+                                    </div>
                                     <div className="text-xs text-gray-500 mt-1">
-                                      Lat {Number(result.lat).toFixed(6)} | Long {Number(result.lon).toFixed(6)}
+                                      Lat {Number(result.lat).toFixed(6)} | Long{" "}
+                                      {Number(result.lon).toFixed(6)}
                                     </div>
                                   </div>
                                 </div>
@@ -1164,7 +1444,11 @@ function StoreForm({
                       </div>
                     )}
 
-                    {errors.area && <small className="text-red-500">{errors.area.message}</small>}
+                    {errors.area && (
+                      <small className="text-red-500">
+                        {errors.area.message}
+                      </small>
+                    )}
                   </div>
                 )}
               />
@@ -1173,14 +1457,23 @@ function StoreForm({
             <div className="space-y-2 md:col-span-2">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Refine on map</label>
+                  <label className="text-sm font-semibold text-gray-700">
+                    Refine on map
+                  </label>
                   <p className="text-xs text-gray-500 mt-1">
-                    Click the map or drag the marker after choosing a detailed location.
+                    Click the map or drag the marker after choosing a detailed
+                    location.
                   </p>
                 </div>
                 <div className="text-xs text-gray-500 text-right">
-                  <div>Lat: {Number(selectedLat || INDIA_CENTER.latitude).toFixed(6)}</div>
-                  <div>Long: {Number(selectedLong || INDIA_CENTER.longitude).toFixed(6)}</div>
+                  <div>
+                    Lat:{" "}
+                    {Number(selectedLat || INDIA_CENTER.latitude).toFixed(6)}
+                  </div>
+                  <div>
+                    Long:{" "}
+                    {Number(selectedLong || INDIA_CENTER.longitude).toFixed(6)}
+                  </div>
                 </div>
               </div>
 
@@ -1188,7 +1481,8 @@ function StoreForm({
                 className="rounded-2xl overflow-hidden border border-yellow-200 shadow-[0_16px_40px_rgba(15,23,42,0.12)]"
                 style={{
                   minHeight: 320,
-                  background: "linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,251,236,0.98) 100%)",
+                  background:
+                    "linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,251,236,0.98) 100%)",
                 }}
               >
                 {isMapLoading ? (
@@ -1200,7 +1494,12 @@ function StoreForm({
                     latitude={Number(selectedLat || INDIA_CENTER.latitude)}
                     longitude={Number(selectedLong || INDIA_CENTER.longitude)}
                     center={mapCenter}
-                    selectedLocation={selectedLocationLabel || locationQuery || selectedArea || undefined}
+                    selectedLocation={
+                      selectedLocationLabel ||
+                      locationQuery ||
+                      selectedArea ||
+                      undefined
+                    }
                     onPick={(latitude, longitude) => {
                       void setLocationFromMap(latitude, longitude);
                     }}
@@ -1210,7 +1509,9 @@ function StoreForm({
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">GSTIN</label>
+              <label className="text-sm font-semibold text-gray-700">
+                GSTIN
+              </label>
               <InputText
                 {...register("gstin")}
                 placeholder="Enter GSTIN"
@@ -1218,8 +1519,14 @@ function StoreForm({
               />
             </div>
 
-            <input type="hidden" {...register("lat", { valueAsNumber: true })} />
-            <input type="hidden" {...register("long", { valueAsNumber: true })} />
+            <input
+              type="hidden"
+              {...register("lat", { valueAsNumber: true })}
+            />
+            <input
+              type="hidden"
+              {...register("long", { valueAsNumber: true })}
+            />
           </div>
         </div>
 
@@ -1238,7 +1545,9 @@ function StoreForm({
               <input
                 type="time"
                 value={timingOpen}
-                onChange={(e) => handleGeneralTimingChange("open", e.target.value)}
+                onChange={(e) =>
+                  handleGeneralTimingChange("open", e.target.value)
+                }
                 className="w-full p-2 border border-yellow-300 rounded-lg"
               />
             </div>
@@ -1250,7 +1559,9 @@ function StoreForm({
               <input
                 type="time"
                 value={timingClose}
-                onChange={(e) => handleGeneralTimingChange("close", e.target.value)}
+                onChange={(e) =>
+                  handleGeneralTimingChange("close", e.target.value)
+                }
                 className="w-full p-2 border border-yellow-300 rounded-lg"
               />
             </div>
@@ -1258,13 +1569,18 @@ function StoreForm({
 
           {buildWeekTiming(timingOpen, timingClose) && (
             <div className="text-sm text-gray-600 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
-              General timing: <span className="font-semibold text-gray-800">{buildWeekTiming(timingOpen, timingClose)}</span>
+              General timing:{" "}
+              <span className="font-semibold text-gray-800">
+                {buildWeekTiming(timingOpen, timingClose)}
+              </span>
             </div>
           )}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-gray-600">Add day-specific timings only when needed.</p>
+              <p className="text-sm text-gray-600">
+                Add day-specific timings only when needed.
+              </p>
               <Button
                 type="button"
                 label="Add Day Timing"
@@ -1276,19 +1592,25 @@ function StoreForm({
 
             {timingRows.length === 0 ? (
               <div className="rounded-lg border border-dashed border-yellow-300 bg-yellow-50/70 px-4 py-5 text-sm text-gray-600">
-                No daily timings added yet. Use the button above to add Monday, Tuesday, or any other day you want.
+                No daily timings added yet. Use the button above to add Monday,
+                Tuesday, or any other day you want.
               </div>
             ) : (
               <div className="space-y-3">
                 {timingRows.map((row) => (
-                  <div key={row.id} className="grid grid-cols-1 md:grid-cols-[1.1fr_1.4fr_auto] gap-3 items-end">
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-1 md:grid-cols-[1.1fr_1.4fr_auto] gap-3 items-end"
+                  >
                     <div className="space-y-1">
                       <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
                         Day <span className="text-red-500">*</span>
                       </label>
                       <InputText
                         value={row.day}
-                        onChange={(e) => updateTimingRow(row.id, "day", e.target.value)}
+                        onChange={(e) =>
+                          updateTimingRow(row.id, "day", e.target.value)
+                        }
                         placeholder="Monday"
                         className="w-full p-2 border border-yellow-300 rounded-lg"
                       />
@@ -1300,7 +1622,9 @@ function StoreForm({
                       </label>
                       <InputText
                         value={row.timing}
-                        onChange={(e) => updateTimingRow(row.id, "timing", e.target.value)}
+                        onChange={(e) =>
+                          updateTimingRow(row.id, "timing", e.target.value)
+                        }
                         placeholder="e.g., 9AM - 9PM"
                         className="w-full p-2 border border-yellow-300 rounded-lg"
                       />
@@ -1333,7 +1657,9 @@ function StoreForm({
           {/* Existing Images */}
           {existingImages.length > 0 && (
             <div>
-              <label className="text-sm font-semibold text-gray-700 block mb-2">Existing Images</label>
+              <label className="text-sm font-semibold text-gray-700 block mb-2">
+                Existing Images
+              </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {existingImages.map((img, idx) => (
                   <div key={idx} className="relative group">
@@ -1358,7 +1684,9 @@ function StoreForm({
           {/* New Images Preview */}
           {imagePreviews.length > 0 && (
             <div>
-              <label className="text-sm font-semibold text-gray-700 block mb-2">New Images Preview</label>
+              <label className="text-sm font-semibold text-gray-700 block mb-2">
+                New Images Preview
+              </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {imagePreviews.map((preview, idx) => (
                   <div key={idx} className="relative group">
@@ -1382,7 +1710,9 @@ function StoreForm({
 
           {/* Upload New Images */}
           <div className="space-y-1">
-            <label className="text-sm font-semibold text-gray-700">Add More Images</label>
+            <label className="text-sm font-semibold text-gray-700">
+              Add More Images
+            </label>
             <input
               type="file"
               multiple
@@ -1405,7 +1735,9 @@ function StoreForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">SEO Description</label>
+              <label className="text-sm font-semibold text-gray-700">
+                SEO Description
+              </label>
               <InputTextarea
                 {...register("seoDescription")}
                 placeholder="Enter SEO description"
@@ -1415,7 +1747,9 @@ function StoreForm({
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">SEO Keywords (Comma Separated)</label>
+              <label className="text-sm font-semibold text-gray-700">
+                SEO Keywords (Comma Separated)
+              </label>
               <div className="flex gap-2">
                 <InputText
                   value={keywordInput}
@@ -1463,7 +1797,10 @@ function StoreForm({
         {isEditMode && (
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-              <i className="pi pi-check-circle" style={{ color: "#d89f00" }}></i>
+              <i
+                className="pi pi-check-circle"
+                style={{ color: "#d89f00" }}
+              ></i>
               Status & Verification
             </h3>
 
@@ -1474,7 +1811,10 @@ function StoreForm({
                   onChange={(e) => setIsActive(e.checked || false)}
                   inputId="isActive"
                 />
-                <label htmlFor="isActive" className="text-sm font-semibold text-gray-700">
+                <label
+                  htmlFor="isActive"
+                  className="text-sm font-semibold text-gray-700"
+                >
                   Active Store
                 </label>
               </div>
@@ -1503,13 +1843,29 @@ function StoreForm({
             icon="pi pi-times"
             onClick={onClose}
             className="flex-1"
-            style={{ background: "#f5f5f5", color: "#666", border: "1px solid #ddd" }}
+            style={{
+              background: "#f5f5f5",
+              color: "#666",
+              border: "1px solid #ddd",
+            }}
             disabled={isSubmitting}
           />
           <Button
             type="submit"
-            label={isSubmitting ? "Saving..." : isEditMode ? "Update Store" : "Create Store"}
-            icon={isSubmitting ? "pi pi-spin pi-spinner" : isEditMode ? "pi pi-pencil" : "pi pi-check"}
+            label={
+              isSubmitting
+                ? "Saving..."
+                : isEditMode
+                  ? "Update Store"
+                  : "Create Store"
+            }
+            icon={
+              isSubmitting
+                ? "pi pi-spin pi-spinner"
+                : isEditMode
+                  ? "pi pi-pencil"
+                  : "pi pi-check"
+            }
             className="flex-1"
             style={{
               background: "linear-gradient(120deg,#f3be27,#e4a90e)",
@@ -1525,4 +1881,3 @@ function StoreForm({
 }
 
 export default StoreForm;
-
