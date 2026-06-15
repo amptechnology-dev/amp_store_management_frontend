@@ -2,16 +2,17 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, Controller } from 'react-hook-form';
-import { z } from 'zod'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { LoginSchema } from "@/helper/schema/Schema"
-import axiosInstance from '@/service/axios.service'
-import { useAppDispatch } from "@/lib/store/hooks"
-import { tokenSlice } from "../../lib/store/features/storeToken"
+import { useForm, Controller } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { LoginSchema } from "@/helper/schema/Schema";
+import axiosInstance from "@/service/axios.service";
+import { useAppDispatch } from "@/lib/store/hooks";
+import { tokenSlice } from "../../lib/store/features/storeToken";
+import Link from "next/link";
 
-const AUTH_TOKEN_KEY = 'login-token';
-const AUTH_USER_KEY = 'login-user';
+const AUTH_TOKEN_KEY = "login-token";
+const AUTH_USER_KEY = "login-user";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -27,50 +28,45 @@ export default function LoginPage() {
     register,
     control,
     handleSubmit,
-    formState: { errors }
+    formState: { errors },
   } = useForm<LoginForm>({
-    resolver: zodResolver(LoginSchema)
+    resolver: zodResolver(LoginSchema),
   });
 
   const onSubmit = async (data: LoginForm) => {
     setError("");
     setLoading(true);
-
     try {
-      const res = await axiosInstance.post('/api/login', data);
+      const res = await axiosInstance.post("/api/login", data);
       const token = res.data.token;
-      console.log("My token...", token);
-
       dispatch(tokenSlice.actions.saveToken(token));
       localStorage.setItem(AUTH_TOKEN_KEY, token);
-
       try {
-        const profileResponse = await axiosInstance.get('/api/login/profile-page');
+        const profileResponse = await axiosInstance.get(
+          "/api/login/profile-page",
+        );
         const user = profileResponse.data?.user;
-
         if (user) {
           localStorage.setItem(
             AUTH_USER_KEY,
             JSON.stringify({
               id: user._id || user.id,
-              name: user.name || user.email || 'User',
-              email: user.email || '',
+              name: user.name || user.email || "User",
+              email: user.email || "",
               role: user.role,
               picture: user.picture,
-            })
+            }),
           );
         }
       } catch (profileError) {
-        console.error('Unable to load profile after login:', profileError);
+        console.error("Unable to load profile after login:", profileError);
       }
-
-      window.dispatchEvent(new Event('auth-changed'));
-      console.log("Response...", res)
+      window.dispatchEvent(new Event("auth-changed"));
       router.push("/dashboard/store");
     } catch (error: any) {
-      console.log("Login error:", error);
-      const errorMessage = error.response?.data?.message || "Login failed. Please try again.";
-      setError(errorMessage);
+      setError(
+        error.response?.data?.message || "Login failed. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -78,227 +74,293 @@ export default function LoginPage() {
 
   return (
     <main
+      className="min-h-screen flex items-center justify-center px-4"
       style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "18px 12px",
         background:
-          "radial-gradient(850px 460px at 7% 10%, rgba(255, 205, 0, 0.28), transparent 60%), radial-gradient(760px 400px at 95% 90%, rgba(255, 187, 0, 0.2), transparent 60%), linear-gradient(170deg,#fffef6 0%, #fff8db 55%, #fff4c3 100%)",
+          "radial-gradient(circle at 10% 12%, rgba(26,58,107,0.12), transparent 40%), radial-gradient(circle at 90% 88%, rgba(33,150,211,0.14), transparent 40%), linear-gradient(145deg, #f5f8ff 0%, #eef4ff 50%, #f0f6ff 100%)",
       }}
     >
-      <section style={{ width: "100%", maxWidth: 560 }}>
+      <div className="w-full" style={{ maxWidth: 520 }}>
         <div
+          className="rounded-3xl overflow-hidden"
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr",
-            gap: 18,
-            alignItems: "stretch",
+            border: "1px solid var(--border)",
+            boxShadow: "var(--shadow)",
+            background: "var(--surface)",
           }}
         >
-
+          {/* Top accent bar */}
           <div
+            className="h-1.5 w-full"
             style={{
-              borderRadius: 20,
-              overflow: "hidden",
-              border: "1px solid #f0e2af",
-              boxShadow: "0 12px 28px rgba(15,23,42,0.08)",
-              background: "linear-gradient(180deg,#ffffff,#fffdf4)",
+              background:
+                "linear-gradient(110deg, var(--brand-primary), var(--brand-blue), var(--brand-orange))",
             }}
-          >
-            <div style={{ padding: 24 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <div>
-                  <h3 style={{ margin: 0, color: "#3b2e0e", fontSize: 32, fontWeight: 700 }}>Welcome back</h3>
-                  <p style={{ marginTop: 6, marginBottom: 0, color: "#6f5c2c", fontSize: 15 }}>
-                    Use your Justdail admin credentials to continue.
-                  </p>
-                </div>
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 14,
-                    display: "grid",
-                    placeItems: "center",
-                    background: "#fff6d4",
-                    border: "1px solid #efd78a",
-                    color: "#8a6a00",
-                    fontSize: 20,
-                    fontWeight: 700,
-                  }}
-                >
-                  U
-                </div>
+          />
+
+          <div className="p-5">
+            {/* Logo + Brand */}
+            {/* Logo + Brand */}
+            <div className="flex flex-col items-center text-center mb-3">
+              <img
+                src="/img/photos/amp-logo.png"
+                alt="AMP Logo"
+                className="h-12 w-12 rounded-2xl object-contain shadow-md mb-2"
+                style={{ border: "1px solid var(--border)" }}
+              />
+              <p
+                className="text-xl font-black tracking-tight leading-none"
+                style={{ color: "var(--brand-primary)" }}
+              >
+                AMP{" "}
+                <span style={{ color: "var(--brand-orange)" }}>Shopping</span>
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                Store Management Portal
+              </p>
+              <p
+                className="text-sm font-bold mt-0.5"
+                style={{ color: "var(--brand-primary-dark)" }}
+              >
+                Welcome back 👋
+              </p>
+              <div
+                className="w-full h-px mt-2.5"
+                style={{ background: "var(--border)" }}
+              />
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div
+                className="mb-4 rounded-xl px-4 py-2.5 text-sm font-semibold flex items-center gap-2"
+                style={{
+                  background: "#fff1f2",
+                  border: "1px solid #fecdd3",
+                  color: "#b91c1c",
+                }}
+              >
+                ⚠️ {error}
               </div>
+            )}
 
-              {error && (
-                <div
-                  style={{
-                    marginTop: 14,
-                    borderRadius: 10,
-                    padding: "10px 12px",
-                    background: "#fff1f2",
-                    border: "1px solid #fecdd3",
-                    color: "#b91c1c",
-                    fontSize: 14,
-                  }}
+            {/* Form */}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-2.5">
+              {/* Email */}
+              <div>
+                <label
+                  className="text-sm font-semibold block mb-1"
+                  style={{ color: "var(--brand-primary-dark)" }}
                 >
-                  {error}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit(onSubmit)} style={{ marginTop: 18, display: "grid", gap: 14 }}>
-                <div>
-                  <label htmlFor="email" style={{ display: "block", fontWeight: 600, marginBottom: 7, color: "#4f3f16" }}>
-                    Email
-                  </label>
+                  Email address
+                </label>
+                <div className="relative">
+                  <span
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-base leading-none"
+                    style={{ color: "var(--muted)" }}
+                  >
+                    ✉️
+                  </span>
                   <input
                     id="email"
                     type="email"
-                    {...register('email')}
-                    placeholder="Please enter email address"
+                    {...register("email")}
+                    placeholder="your@email.com"
                     autoComplete="email"
+                    className="w-full rounded-xl text-sm outline-none transition-all"
                     style={{
-                      width: "100%",
                       height: 44,
-                      borderRadius: 10,
-                      border: errors.email ? "1px solid #ef4444" : "1px solid #e8d89f",
-                      background: "#fffef9",
-                      padding: "0 12px",
-                      outline: "none",
+                      paddingLeft: 36,
+                      paddingRight: 12,
+                      border: errors.email
+                        ? "1.5px solid #ef4444"
+                        : "1.5px solid var(--border)",
+                      background: "var(--surface-soft)",
+                      color: "var(--foreground)",
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "var(--brand-blue)";
+                      e.target.style.boxShadow =
+                        "0 0 0 3px rgba(33,150,211,0.12)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = errors.email
+                        ? "#ef4444"
+                        : "var(--border)";
+                      e.target.style.boxShadow = "";
                     }}
                   />
-                  {errors.email && (
-                    <small style={{ color: "#dc2626", fontSize: 12, marginTop: 4, display: "block" }}>
-                      {errors.email.message}
-                    </small>
-                  )}
                 </div>
+                {errors.email && (
+                  <small className="text-red-500 text-xs mt-1 block">
+                    ⚠️ {errors.email.message}
+                  </small>
+                )}
+              </div>
 
-                <div>
-                  <label htmlFor="password" style={{ display: "block", fontWeight: 600, marginBottom: 7, color: "#4f3f16" }}>
-                    Password
-                  </label>
-                  <Controller
-                    name="password"
-                    control={control}
-                    render={({ field }) => (
-                      <div style={{ position: "relative", width: "100%" }}>
-                        <input
-                          id="password"
-                          type={showPassword ? "text" : "password"}
-                          value={field.value || ""}
-                          onChange={(e) => field.onChange(e.target.value)}
-                          placeholder="Enter password"
-                          autoComplete="current-password"
-                          style={{
-                            width: "100%",
-                            height: 44,
-                            borderRadius: 10,
-                            border: errors.password ? "1px solid #ef4444" : "1px solid #e8d89f",
-                            background: "#fffef9",
-                            padding: "0 40px 0 12px",
-                            outline: "none",
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword((prev) => !prev)}
-                          aria-label={showPassword ? "Hide password" : "Show password"}
-                          style={{
-                            position: "absolute",
-                            right: 10,
-                            top: "50%",
-                            transform: "translateY(-50%)",
-                            border: "none",
-                            background: "transparent",
-                            color: "#8f7a40",
-                            cursor: "pointer",
-                            padding: 0,
-                            display: "grid",
-                            placeItems: "center",
-                            fontSize: 13,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {showPassword ? "Hide" : "Show"}
-                        </button>
-                      </div>
-                    )}
+              {/* Password */}
+              <div>
+                <label
+                  className="text-sm font-semibold block mb-1"
+                  style={{ color: "var(--brand-primary-dark)" }}
+                >
+                  Password
+                </label>
+                <Controller
+                  name="password"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="relative">
+                      <span
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-base leading-none"
+                        style={{ color: "var(--muted)" }}
+                      >
+                        🔒
+                      </span>
+                      <input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        placeholder="Enter your password"
+                        autoComplete="current-password"
+                        className="w-full rounded-xl text-sm outline-none transition-all"
+                        style={{
+                          height: 44,
+                          paddingLeft: 36,
+                          paddingRight: 48,
+                          border: errors.password
+                            ? "1.5px solid #ef4444"
+                            : "1.5px solid var(--border)",
+                          background: "var(--surface-soft)",
+                          color: "var(--foreground)",
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = "var(--brand-blue)";
+                          e.target.style.boxShadow =
+                            "0 0 0 3px rgba(33,150,211,0.12)";
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = errors.password
+                            ? "#ef4444"
+                            : "var(--border)";
+                          e.target.style.boxShadow = "";
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((p) => !p)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-lg leading-none"
+                      >
+                        {showPassword ? "🙈" : "👁️"}
+                      </button>
+                    </div>
+                  )}
+                />
+                {errors.password && (
+                  <small className="text-red-500 text-xs mt-1 block">
+                    ⚠️ {errors.password.message}
+                  </small>
+                )}
+              </div>
+
+              {/* Remember + Forgot — overflow fix */}
+              <div className="flex items-center justify-between gap-4 py-0.5">
+                <label
+                  className="flex items-center gap-2 text-sm cursor-pointer select-none shrink-0"
+                  style={{ color: "var(--muted)" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      minWidth: 16,
+                      accentColor: "var(--brand-blue)",
+                      cursor: "pointer",
+                    }}
                   />
-                  {errors.password && (
-                    <small style={{ color: "#dc2626", fontSize: 12, marginTop: 4, display: "block" }}>
-                      {errors.password.message}
-                    </small>
-                  )}
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 10, color: "#655526", cursor: "pointer" }}>
-                    <input
-                      id="remember"
-                      type="checkbox"
-                      checked={remember}
-                      onChange={(e) => setRemember(e.target.checked)}
-                      style={{ width: 16, height: 16, accentColor: "#d89f00" }}
-                    />
-                    <span>
-                      Remember me
-                    </span>
-                  </label>
-                  <a href="/forget-password" style={{ color: "#a06f00", textDecoration: "none", fontWeight: 600 }}>
-                    Forgot password?
-                  </a>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  style={{
-                    width: "100%",
-                    height: 46,
-                    borderRadius: 12,
-                    border: "1px solid #e0ac1f",
-                    background: loading
-                      ? "linear-gradient(120deg,#f1d47e,#edcc6b)"
-                      : "linear-gradient(120deg,#f3be27,#e4a90e)",
-                    color: "#3b2f0f",
-                    fontWeight: 700,
-                    fontSize: 16,
-                    cursor: loading ? "not-allowed" : "pointer",
-                  }}
+                  Remember me
+                </label>
+                <Link
+                  href="/forget-password"
+                  className="text-sm font-semibold hover:underline shrink-0"
+                  style={{ color: "var(--brand-blue)" }}
                 >
-                  {loading ? "Signing in..." : "Sign in"}
-                </button>
-              </form>
-
-              <div style={{ marginTop: 14, textAlign: "center" }}>
-                <small style={{ color: "#9b8651" }}>
-                  Need account access? <a href="/admin/register">Contact administrator</a>
-                </small>
+                  Forgot password?
+                </Link>
               </div>
 
-              <div style={{ marginTop: 10, textAlign: "center" }}>
-                <button
-                  type="button"
-                  onClick={() => router.push("/")}
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    color: "#8a6711",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Back to Welcome
-                </button>
-              </div>
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-xl font-bold text-sm text-white transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{
+                  height: 44,
+                  background:
+                    "linear-gradient(110deg, var(--brand-primary), var(--brand-blue))",
+                  boxShadow: "0 4px 18px rgba(26,58,107,0.3)",
+                }}
+              >
+                {loading ? "⏳ Signing in..." : "→ Sign in"}
+              </button>
+            </form>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 my-3">
+              <div
+                className="flex-1 h-px"
+                style={{ background: "var(--border)" }}
+              />
+              <span
+                className="text-xs font-semibold"
+                style={{ color: "var(--muted)" }}
+              >
+                OR
+              </span>
+              <div
+                className="flex-1 h-px"
+                style={{ background: "var(--border)" }}
+              />
+            </div>
+
+            {/* Register */}
+            <div
+              className="rounded-xl px-4 py-2 text-center text-sm"
+              style={{
+                background: "var(--surface-soft)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <span style={{ color: "var(--muted)" }}>
+                Don&apos;t have an account?{" "}
+              </span>
+              <Link
+                href="/register"
+                className="font-bold hover:underline"
+                style={{ color: "var(--brand-orange)" }}
+              >
+                Register your store →
+              </Link>
+            </div>
+
+            {/* Back */}
+            <div className="mt-2 text-center">
+              <button
+                type="button"
+                onClick={() => router.push("/store")}
+                className="text-xs font-semibold hover:underline"
+                style={{ color: "var(--muted)" }}
+              >
+                ← Back to Store
+              </button>
             </div>
           </div>
         </div>
-      </section>
+      </div>
     </main>
   );
 }

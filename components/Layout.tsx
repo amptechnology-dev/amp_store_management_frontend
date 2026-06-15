@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import { Role, useProfileStore } from "@/lib/store/profileStore"
+import "primeicons/primeicons.css";
 interface LayoutProps {
   children: React.ReactNode;
   user?: {

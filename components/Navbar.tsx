@@ -16,6 +16,14 @@ interface NavbarProps {
     };
 }
 
+// Role-wise accent color (matches Sidebar)
+const roleColors: Record<string, string> = {
+    ADMIN: "var(--brand-orange)",
+    MANAGER: "var(--brand-blue)",
+    CASHIER: "var(--brand-amber)",
+    STORE: "var(--brand-primary-light)",
+};
+
 const Navbar: React.FC<NavbarProps> = ({ user, role }) => {
     const [collapsed, setCollapsed] = useState<boolean>(false);
     const [isMobile, setIsMobile] = useState<boolean>(false);
@@ -109,19 +117,19 @@ const Navbar: React.FC<NavbarProps> = ({ user, role }) => {
     };
 
     const navStyle: React.CSSProperties = {
-        background: "linear-gradient(90deg, #fffef9, #fff7db)",
-        borderBottom: "1px solid #efd992",
+        background: "var(--surface)",
+        borderBottom: "1px solid var(--border)",
         padding: isMobile ? "8px 12px" : "12px 24px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        boxShadow: "0 4px 14px rgba(128, 96, 9, 0.12)",
+        boxShadow: "0 4px 16px rgba(15, 28, 53, 0.05)",
         position: "fixed",
         top: 0,
-        left: isMobile ? 0 : (collapsed ? "88px" : "260px"),
+        left: isMobile ? 0 : (collapsed ? "86px" : "264px"),
         right: 0,
         height: isMobile ? "64px" : "72px",
-        transition: "left 0.3s, padding 0.2s",
+        transition: "left 0.28s ease, padding 0.2s",
         zIndex: 999,
     };
 
@@ -134,15 +142,16 @@ const Navbar: React.FC<NavbarProps> = ({ user, role }) => {
                     text
                     severity="secondary"
                     onClick={toggleSidebar}
-                    style={{ color: "#9f6f00" }}
+                    className="nav-icon-btn"
+                    style={{ color: "var(--brand-primary)" }}
                 />
 
                 <div>
-                    <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 20, fontWeight: 700, color: "#3d2f0f" }}>
+                    <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 20, fontWeight: 700, color: "var(--brand-primary-dark)" }}>
                         {pageTitle}
                     </h1>
                     {!isMobile && (
-                        <p style={{ margin: 0, fontSize: 13, color: "#7a632b" }}>
+                        <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>
                             Welcome back, manage Amp Store operations
                         </p>
                     )}
@@ -151,37 +160,87 @@ const Navbar: React.FC<NavbarProps> = ({ user, role }) => {
 
             <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 12 }}>
                 {!isMobile && (
-                    <div style={{ width: 1, height: 32, background: "#e9d9a4", margin: "0 8px" }} />
+                    <div style={{ width: 1, height: 32, background: "var(--border)", margin: "0 8px" }} />
                 )}
 
                 <div>
-                    <Menu className="" model={userMenuItems} popup ref={menuRef} />
+                    <Menu className="amp-user-menu" model={userMenuItems} popup ref={menuRef} />
                     <div
                         onClick={(e) => menuRef.current?.toggle(e)}
+                        className="amp-user-trigger"
                         style={{
                             display: "flex",
                             alignItems: "center",
                             gap: isMobile ? 8 : 12,
-                            padding: isMobile ? "4px 8px" : "6px 12px",
-                            borderRadius: 12,
+                            padding: isMobile ? "4px 8px" : "6px 14px 6px 6px",
+                            borderRadius: 999,
                             cursor: "pointer",
-                            border: "1px solid #efd992",
-                            background: "#fffdf4",
+                            border: "1px solid var(--border)",
+                            background: "var(--surface-soft)",
                         }}
                     >
                         <Avatar image={user.image} shape="circle" />
 
                         {!isMobile && (
-                            <div>
-                                <div style={{ fontWeight: 600, color: "#3d2f0f" }}>{user.name}</div>
-                                <div style={{ fontSize: 12, color: "#7a632b" }}>{roleLabel}</div>
+                            <div style={{ lineHeight: 1.25 }}>
+                                <div style={{ fontWeight: 600, fontSize: "0.88rem", color: "var(--brand-primary-dark)" }}>
+                                    {user.name}
+                                </div>
+                                <div
+                                    style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        fontSize: "0.68rem",
+                                        fontWeight: 700,
+                                        letterSpacing: "0.06em",
+                                        textTransform: "uppercase",
+                                        color: roleColors[role] || "var(--brand-primary)",
+                                    }}
+                                >
+                                    {roleLabel}
+                                </div>
                             </div>
                         )}
 
-                        <i className="pi pi-chevron-down" style={{ color: "#9f6f00" }} />
+                        <i className="pi pi-chevron-down" style={{ color: "var(--brand-blue)", fontSize: 12 }} />
                     </div>
                 </div>
             </div>
+
+            {/* Hover & popup menu theming */}
+            <style jsx global>{`
+                .nav-icon-btn:hover {
+                    background: var(--surface-soft) !important;
+                    color: var(--brand-primary) !important;
+                }
+                .amp-user-trigger:hover {
+                    border-color: var(--brand-blue) !important;
+                    box-shadow: 0 4px 14px rgba(33, 150, 211, 0.15);
+                }
+                .amp-user-menu.p-menu {
+                    border-radius: 14px !important;
+                    border: 1px solid var(--border) !important;
+                    box-shadow: var(--shadow) !important;
+                    padding: 6px !important;
+                    min-width: 200px;
+                }
+                .amp-user-menu .p-menuitem-link {
+                    border-radius: 10px !important;
+                    color: var(--foreground) !important;
+                    gap: 10px;
+                }
+                .amp-user-menu .p-menuitem-link:hover {
+                    background: var(--surface-soft) !important;
+                    color: var(--brand-primary) !important;
+                }
+                .amp-user-menu .p-menuitem-icon {
+                    color: var(--brand-blue) !important;
+                }
+                .amp-user-menu .p-menuitem-separator {
+                    border-color: var(--border) !important;
+                    margin: 4px 0;
+                }
+            `}</style>
         </nav>
     );
 };

@@ -627,7 +627,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <div className="flex items-center gap-2 mt-auto">
             <button
               onClick={onAddToCart}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2 text-xs font-bold text-white shadow-sm transition hover:from-amber-600 hover:to-orange-600 active:scale-95"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold text-white shadow-sm transition active:scale-95"
+style={{ background: "linear-gradient(110deg, #f97316, #1a3a6b)" }}
             >
               <i className="pi pi-shopping-cart text-xs" />
               Add to Cart
@@ -764,13 +765,13 @@ const ReviewModal: React.FC<ReviewModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-orange-50">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100" style={{ background: "linear-gradient(110deg, #eef4ff, #f0f6ff)" }}>
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl shadow-sm" style={{ background: "linear-gradient(135deg, #1a3a6b, #2196d3)" }}>
               <i className="pi pi-star-fill text-white text-xs" />
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600 leading-none">
+              <p className="text-[10px] font-bold uppercase tracking-widest leading-none" style={{ color: "#1a3a6b" }}>
                 Rate & Review
               </p>
               <h2
@@ -879,7 +880,8 @@ const ReviewModal: React.FC<ReviewModalProps> = ({
           <button
             onClick={async () => await onSubmit(rating, comment)}
             disabled={submitting || rating === 0 || comment.trim().length === 0}
-            className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2.5 text-sm font-bold text-white shadow-sm transition hover:from-amber-600 hover:to-orange-600 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex flex-[2] items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
+style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
           >
             {submitting ? (
               <>
@@ -1092,7 +1094,7 @@ export default function StoreDetails() {
         <Header />
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
-            <i className="pi pi-spin pi-spinner mb-4 block text-5xl text-amber-500" />
+            <i className="pi pi-spin pi-spinner mb-4 block text-5xl" style={{ color: "#2196d3" }} />
             <p className="font-semibold text-slate-500">
               Checking sign-in status…
             </p>
@@ -1111,10 +1113,10 @@ export default function StoreDetails() {
           <div className="fixed inset-0 z-30 bg-slate-950/50 backdrop-blur-sm" />
           <div className="relative z-40 w-full max-w-md overflow-hidden rounded-3xl border border-white/80 bg-white p-8 shadow-2xl">
             <div className="text-center">
-              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-slate-950 text-white">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full text-white" style={{ background: "linear-gradient(135deg, #1a3a6b, #2196d3)" }}>
                 <i className="pi pi-lock text-2xl" />
               </div>
-              <p className="text-xs font-bold uppercase tracking-widest text-amber-600">
+              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#2196d3" }}>
                 Sign in required
               </p>
               <h1 className="mt-3 text-2xl font-black text-slate-950">
@@ -1153,7 +1155,7 @@ export default function StoreDetails() {
         <Header />
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
-            <i className="pi pi-spin pi-spinner mb-4 block text-5xl text-amber-500" />
+            <i className="pi pi-spin pi-spinner mb-4 block text-5xl" style={{ color: "#2196d3" }} />
             <p className="font-semibold text-slate-500">
               Loading store details…
             </p>
@@ -1253,7 +1255,7 @@ export default function StoreDetails() {
                 <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
                   <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                      <i className="pi pi-shopping-bag text-amber-500" />
+                      <i className="pi pi-shopping-bag" style={{ color: "#f97316" }} />
                       Products
                       <span className="text-sm font-normal text-slate-500">
                         ({products.length})
@@ -1287,7 +1289,8 @@ export default function StoreDetails() {
                         <div className="mt-5 flex justify-center">
                           <button
                             onClick={() => setShowAllProducts(true)}
-                            className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-6 py-2.5 text-sm font-bold text-amber-700 shadow-sm transition hover:bg-amber-100 hover:border-amber-400 active:scale-95"
+                            className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-bold text-white shadow-sm transition active:scale-95"
+style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
                           >
                             <i className="pi pi-plus-circle text-sm" />
                             Load More
@@ -1419,7 +1422,8 @@ export default function StoreDetails() {
                   <div className="px-4 py-3">
                     <button
                       onClick={() => setIsReviewModalOpen(true)}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2.5 text-sm font-bold text-white shadow-sm transition hover:from-amber-600 hover:to-orange-600 active:scale-95"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white shadow-sm transition active:scale-95"
+style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
                     >
                       <i className="pi pi-star-fill text-sm" />
                       Write a Review
@@ -1498,7 +1502,7 @@ export default function StoreDetails() {
               <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
                 <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
                   <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <i className="pi pi-shopping-bag text-amber-500" />
+                    <i className="pi pi-shopping-bag" style={{ color: "#f97316" }} />
                     More Products
                   </h2>
                   <button
@@ -1644,7 +1648,7 @@ export default function StoreDetails() {
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-blue-600">
+                    <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#1a3a6b" }}>
                       Store Location
                     </p>
                     <h2 className="mt-0.5 text-lg font-black text-slate-900">
@@ -1740,7 +1744,7 @@ export default function StoreDetails() {
               >
                 <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-amber-600">
+                    <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#2196d3" }}>
                       Customer reviews
                     </p>
                     <h2

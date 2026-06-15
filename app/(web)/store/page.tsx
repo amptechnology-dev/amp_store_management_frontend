@@ -8,6 +8,7 @@ import React, {
   useRef,
 } from "react";
 import dynamic from "next/dynamic";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import axiosInstance from "@/service/axios.service";
 import VortexLoader from "@/app/(web)/components/VortexLoader";
@@ -527,6 +528,31 @@ function HeroBanner() {
   );
 }
 
+function ScrollToTop() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setVisible(window.scrollY > 10);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <button
+      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      className="fixed bottom-6 right-6 z-[998] flex h-11 w-11 items-center justify-center rounded-full shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+      style={{
+        background: "linear-gradient(135deg, #1a3a6b, #2196d3)",
+      }}
+      title="Back to top"
+    >
+      <i className="pi pi-arrow-up text-sm text-white" />
+    </button>
+  );
+}
+
 // ─── CategoryGrid (Just Dial icon boxes) ──────────────────────────────────────
 
 function CategoryGrid({
@@ -866,7 +892,12 @@ function StoreCard({ store }: { store: Store }) {
             📍 {location || "Location not set"}
           </p>
           <Link href={`/store/${store._id}`} className="shrink-0">
-            <button className="rounded-full bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700">
+            <button
+              className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-white transition"
+              style={{
+                background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+              }}
+            >
               View →
             </button>
           </Link>
@@ -897,6 +928,8 @@ const LOAD_STEP = 12;
 
 export default function Home() {
   const [search, setSearch] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [location, setLocation] = useState("");
   const [activeFeed, setActiveFeed] = useState<FeedMode>("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -961,6 +994,15 @@ export default function Home() {
     selectedArea,
     activeCategoryTab,
   ]);
+
+  useEffect(() => {
+  const stateFromUrl = searchParams.get("state");
+  if (stateFromUrl) {
+    setSelectedState(stateFromUrl);
+  } else {
+    setSelectedState("all");
+  }
+}, [searchParams]);
 
   const uniqueCategories = useMemo(
     () =>
@@ -1105,6 +1147,7 @@ export default function Home() {
     clearSubCategoryFilter();
     setCategoryViewActive(false); // ← reset
     setCategoryViewName("");
+    router.push("/store");
   };
 
   if (loading) return <VortexLoader />;
@@ -1140,7 +1183,11 @@ export default function Home() {
               {/* Back button */}
               <button
                 onClick={clearAll}
-                className="flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+                className="flex shrink-0 items-center gap-1 rounded-full border px-3 py-2 text-xs font-semibold text-white transition"
+                style={{
+                  background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                  borderColor: "#1a3a6b",
+                }}
               >
                 <ChevronLeft size={14} />
                 Back
@@ -1154,7 +1201,17 @@ export default function Home() {
                   placeholder={`Search in ${categoryViewName}...`}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-full border border-slate-200 bg-slate-50 py-2 pl-8 pr-4 text-sm text-slate-800 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100 transition"
+                  className="w-full rounded-full border border-slate-200 bg-slate-50 py-2 pl-8 pr-4 text-sm text-slate-800 outline-none focus:bg-white transition"
+                  style={{ "--tw-ring-color": "#2196d3" } as any}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#2196d3";
+                    e.target.style.boxShadow =
+                      "0 0 0 3px rgba(33,150,211,0.15)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "";
+                    e.target.style.boxShadow = "";
+                  }}
                 />
               </div>
 
@@ -1166,7 +1223,7 @@ export default function Home() {
                     onClick={() => setActiveFeed(mode.key)}
                     className={`rounded-full px-3 py-1.5 text-xs font-semibold transition whitespace-nowrap ${
                       activeFeed === mode.key
-                        ? "bg-blue-600 text-white shadow"
+                        ? "text-white shadow"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
@@ -1251,7 +1308,11 @@ export default function Home() {
                         Math.min(c + LOAD_STEP, visibleStores.length),
                       )
                     }
-                    className="rounded-full border border-slate-300 bg-white px-8 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                    className="rounded-full border px-8 py-3 text-sm font-bold text-white shadow-sm transition"
+                    style={{
+                      background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                      borderColor: "#1a3a6b",
+                    }}
                   >
                     Load more (
                     {Math.min(LOAD_STEP, visibleStores.length - visibleCount)}{" "}
@@ -1321,16 +1382,24 @@ export default function Home() {
                     onClick={() => setActiveFeed(mode.key)}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition ${
                       activeFeed === mode.key
-                        ? "bg-blue-50 text-blue-700"
+                        ? "text-white"
                         : "text-slate-700 hover:bg-slate-50"
                     }`}
+                    style={
+                      activeFeed === mode.key
+                        ? {
+                            background:
+                              "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                          }
+                        : {}
+                    }
                   >
                     <i
-                      className={`pi ${mode.icon} text-sm ${activeFeed === mode.key ? "text-blue-600" : "text-slate-400"}`}
+                      className={`pi ${mode.icon} text-sm ${activeFeed === mode.key ? "text-white" : "text-slate-400"}`}
                     />
                     {mode.label}
                     {activeFeed === mode.key && (
-                      <i className="pi pi-check ml-auto text-xs text-blue-600" />
+                      <i className="pi pi-check ml-auto text-xs text-white" />
                     )}
                   </button>
                 ))}
@@ -1364,7 +1433,13 @@ export default function Home() {
               {hasFilters && (
                 <div className="flex flex-wrap gap-2">
                   {search.trim() && (
-                    <span className="flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                    <span
+                      className="flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold text-white"
+                      style={{
+                        background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                        borderColor: "#1a3a6b",
+                      }}
+                    >
                       &quot;{search}&quot;
                       <button onClick={() => setSearch("")}>
                         <i className="pi pi-times text-[10px]" />
@@ -1420,7 +1495,10 @@ export default function Home() {
                 </p>
                 <button
                   onClick={clearAll}
-                  className="mt-4 rounded-full bg-blue-600 px-5 py-2 text-sm font-bold text-white"
+                  className="mt-4 rounded-full px-5 py-2 text-sm font-bold text-white"
+                  style={{
+                    background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                  }}
                 >
                   Reset filters
                 </button>
@@ -1440,7 +1518,11 @@ export default function Home() {
                           Math.min(c + LOAD_STEP, visibleStores.length),
                         )
                       }
-                      className="rounded-full border border-slate-300 bg-white px-8 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                      className="rounded-full border px-8 py-3 text-sm font-bold text-white shadow-sm transition"
+                      style={{
+                        background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                        borderColor: "#1a3a6b",
+                      }}
                     >
                       Load more (
                       {Math.min(LOAD_STEP, visibleStores.length - visibleCount)}{" "}
@@ -1453,6 +1535,8 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      <ScrollToTop />
 
       <Footer />
     </div>

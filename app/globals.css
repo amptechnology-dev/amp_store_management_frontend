@@ -1,17 +1,42 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
+@import "primeicons/primeicons.css";
 
 :root {
-  --background: #f7f8fb;
-  --foreground: #131722;
+  /* ── AMP Technology Brand Colors ── */
+  --background: #f5f8ff;
+  --foreground: #0f1c35;
   --surface: #ffffff;
-  --surface-soft: #f4f7ff;
-  --brand: #ffcf00;
-  --brand-strong: #ffb700;
-  --brand-ink: #1d232f;
+  --surface-soft: #eef4ff;
+
+  /* Primary — Deep Blue */
+  --brand-primary: #1a3a6b;
+  --brand-primary-light: #2557a7;
+  --brand-primary-dark: #0f1c35;
+
+  /* Secondary — Sky Blue */
+  --brand-blue: #2196d3;
+  --brand-blue-light: #56b4e8;
+  --brand-blue-dark: #1270a8;
+
+  /* Accent — Orange */
+  --brand-orange: #f97316;
+  --brand-orange-light: #fb923c;
+  --brand-orange-dark: #ea6000;
+
+  /* Accent — Amber/Gold */
+  --brand-amber: #f59e0b;
+  --brand-amber-light: #fbbf24;
+  --brand-amber-dark: #d97706;
+
+  /* Legacy aliases (backward compat) */
+  --brand: #f97316;
+  --brand-strong: #ea6000;
+  --brand-ink: #ffffff;
+
   --muted: #5f6b7a;
-  --border: #e4e9f2;
-  --shadow: 0 24px 55px rgba(17, 22, 34, 0.12);
+  --border: #dde8f5;
+  --shadow: 0 24px 55px rgba(15, 28, 53, 0.12);
 }
 
 * {
@@ -25,15 +50,16 @@ body {
   margin: 0;
 }
 
+/* ── Background ── */
 .jd-home {
   min-height: 100vh;
   position: relative;
   overflow: hidden;
   padding: 28px;
   background:
-    radial-gradient(circle at 10% 12%, rgba(255, 207, 0, 0.18), transparent 35%),
-    radial-gradient(circle at 88% 18%, rgba(26, 76, 145, 0.16), transparent 34%),
-    linear-gradient(145deg, #f5f8ff 0%, #f8f9fb 45%, #eef4ff 100%);
+    radial-gradient(circle at 10% 12%, rgba(249, 115, 22, 0.12), transparent 35%),
+    radial-gradient(circle at 88% 18%, rgba(26, 58, 107, 0.14), transparent 34%),
+    linear-gradient(145deg, #f5f8ff 0%, #f8fafc 45%, #eef4ff 100%);
 }
 
 .jd-shell {
@@ -56,7 +82,7 @@ body {
 }
 
 .jd-simple-card {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(5px);
   border: 1px solid var(--border);
   border-radius: 22px;
@@ -88,7 +114,7 @@ body {
   margin-top: 20px;
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid #e6ecf8;
+  border: 1px solid #dde8f5;
 }
 
 .jd-simple-image {
@@ -98,6 +124,7 @@ body {
   display: block;
 }
 
+/* ── Background Orbs ── */
 .jd-bg-orb {
   position: absolute;
   border-radius: 999px;
@@ -110,7 +137,7 @@ body {
   height: 340px;
   left: -120px;
   top: -100px;
-  background: radial-gradient(circle, rgba(255, 208, 0, 0.55), rgba(255, 208, 0, 0));
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.45), rgba(249, 115, 22, 0));
 }
 
 .jd-bg-orb-two {
@@ -118,19 +145,20 @@ body {
   height: 360px;
   right: -140px;
   bottom: -130px;
-  background: radial-gradient(circle, rgba(12, 98, 183, 0.25), rgba(12, 98, 183, 0));
+  background: radial-gradient(circle, rgba(26, 58, 107, 0.28), rgba(26, 58, 107, 0));
 }
 
+/* ── Topbar ── */
 .jd-topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.75);
   border-radius: 18px;
   padding: 14px 20px;
-  box-shadow: 0 12px 30px rgba(20, 26, 38, 0.08);
+  box-shadow: 0 12px 30px rgba(15, 28, 53, 0.08);
 }
 
 .jd-brand {
@@ -143,6 +171,7 @@ body {
   margin: 0;
   font-size: 1.2rem;
   font-weight: 700;
+  color: var(--brand-primary);
 }
 
 .jd-brand p {
@@ -156,7 +185,7 @@ body {
   border-radius: 12px;
   padding: 10px 18px;
   font-weight: 600;
-  background: #101727;
+  background: linear-gradient(110deg, var(--brand-primary), var(--brand-blue));
   color: #fff;
   cursor: pointer;
   transition: transform 0.25s ease, box-shadow 0.25s ease;
@@ -164,9 +193,10 @@ body {
 
 .jd-top-login:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(16, 23, 39, 0.22);
+  box-shadow: 0 10px 20px rgba(26, 58, 107, 0.28);
 }
 
+/* ── Hero ── */
 .jd-hero-grid {
   margin-top: 22px;
   display: grid;
@@ -189,7 +219,7 @@ body {
 .jd-tag {
   display: inline-block;
   margin-bottom: 14px;
-  background: linear-gradient(90deg, #0f1a2d, #28497d);
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-blue));
   color: #fff;
   font-size: 0.75rem;
   letter-spacing: 0.08em;
@@ -203,6 +233,7 @@ body {
   font-size: clamp(1.8rem, 3.2vw, 2.7rem);
   line-height: 1.18;
   max-width: 740px;
+  color: var(--brand-primary-dark);
 }
 
 .jd-hero-card p {
@@ -214,6 +245,7 @@ body {
   color: var(--muted);
 }
 
+/* ── Buttons ── */
 .jd-cta-row {
   margin-top: 24px;
   display: flex;
@@ -232,21 +264,28 @@ body {
 }
 
 .jd-btn-primary {
-  background: linear-gradient(110deg, var(--brand), var(--brand-strong));
-  color: var(--brand-ink);
+  background: linear-gradient(110deg, var(--brand-orange), var(--brand-amber));
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(249, 115, 22, 0.3);
 }
 
 .jd-btn-ghost {
-  background: #f5f8ff;
-  border: 1px solid #dde6f6;
-  color: #173054;
+  background: #f0f5ff;
+  border: 1px solid #ccdaf5;
+  color: var(--brand-primary);
 }
 
-.jd-btn-primary:hover,
+.jd-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(249, 115, 22, 0.38);
+}
+
 .jd-btn-ghost:hover {
   transform: translateY(-1px);
+  background: #e6eeff;
 }
 
+/* ── Stats ── */
 .jd-stats-grid {
   margin-top: 24px;
   display: grid;
@@ -255,8 +294,8 @@ body {
 }
 
 .jd-stat-card {
-  background: var(--surface-soft);
-  border: 1px solid #e6ecf8;
+  background: linear-gradient(135deg, #eef4ff, #f5f8ff);
+  border: 1px solid #dde8f5;
   border-radius: 14px;
   padding: 14px;
 }
@@ -264,13 +303,16 @@ body {
 .jd-stat-card h3 {
   margin: 0;
   font-size: 1.2rem;
+  color: var(--brand-primary);
 }
 
 .jd-stat-card p {
   margin-top: 5px;
   font-size: 0.85rem;
+  color: var(--muted);
 }
 
+/* ── Preview Card ── */
 .jd-preview-card {
   padding: 22px;
   display: grid;
@@ -287,6 +329,7 @@ body {
 .jd-preview-header h3 {
   margin: 0;
   font-size: 1.05rem;
+  color: var(--brand-primary-dark);
 }
 
 .jd-preview-header span {
@@ -299,8 +342,8 @@ body {
 }
 
 .jd-mini-kpi {
-  background: #f8fbff;
-  border: 1px solid #e4edf9;
+  background: #f0f6ff;
+  border: 1px solid #d6e6f8;
   border-radius: 12px;
   padding: 12px;
 }
@@ -315,6 +358,7 @@ body {
   margin-top: 5px;
   display: block;
   font-size: 1.02rem;
+  color: var(--brand-primary);
 }
 
 .jd-preview-image-wrap {
@@ -329,6 +373,7 @@ body {
   object-fit: cover;
 }
 
+/* ── Module Strip ── */
 .jd-module-strip {
   margin-top: 18px;
   display: grid;
@@ -344,21 +389,24 @@ body {
   text-align: center;
   font-size: 0.86rem;
   font-weight: 600;
-  color: #1d2a44;
+  color: var(--brand-primary);
+  transition: border-color 0.2s, background 0.2s;
 }
 
+.jd-module-item:hover {
+  border-color: var(--brand-blue);
+  background: #eef4ff;
+}
+
+/* ── Scrollbar ── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Responsive ── */
 @media (max-width: 1024px) {
-  .jd-home {
-    padding: 16px;
-  }
-
-  .jd-hero-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .jd-module-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  .jd-home { padding: 16px; }
+  .jd-hero-grid { grid-template-columns: 1fr; }
+  .jd-module-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
@@ -367,31 +415,11 @@ body {
     align-items: flex-start;
     gap: 10px;
   }
-
-  .jd-top-login {
-    width: 100%;
-  }
-
+  .jd-top-login { width: 100%; }
   .jd-hero-card,
-  .jd-preview-card {
-    border-radius: 18px;
-    padding: 18px;
-  }
-
+  .jd-preview-card { border-radius: 18px; padding: 18px; }
   .jd-stats-grid,
-  .jd-module-strip {
-    grid-template-columns: 1fr;
-  }
-
-  .jd-simple-card {
-    padding: 18px;
-    border-radius: 16px;
-  }
-
-  .jd-simple-image {
-    height: 180px;
-  }
+  .jd-module-strip { grid-template-columns: 1fr; }
+  .jd-simple-card { padding: 18px; border-radius: 16px; }
+  .jd-simple-image { height: 180px; }
 }
-
-.scrollbar-hide::-webkit-scrollbar { display: none; }
-.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
