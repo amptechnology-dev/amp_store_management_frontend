@@ -30,13 +30,20 @@ interface Product {
   __v: number;
 }
 
-interface Ad {
+interface ProductAd {
   _id: string;
-  title: string;
-  description?: string;
-  image?: string;
-  redirectUrl?: string;
+  productId: {
+    _id: string;
+    name: string;
+    images?: string[];
+    description?: string;
+    sellingPrice?: number;
+    isActive?: boolean;
+    isVerified?: boolean;
+    storeId?: { _id: string; storeName: string };
+  };
   rank?: number;
+  expiryDate?: string;
   isActive?: boolean;
 }
 
@@ -189,6 +196,17 @@ const buildWhatsAppShareUrl = (phoneNumber: string, message: string) => {
     ? digitsOnly
     : `91${digitsOnly}`;
   return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`;
+};
+
+const trackStoreAction = async (
+  storeId: string,
+  actionType: "WEBSITE" | "WHATSAPP" | "CALL" | "DIRECTION" | "SHARE",
+) => {
+  try {
+    await axiosInstance.post("/api/store-action", { storeId, actionType });
+  } catch (error) {
+    console.log("Error Fetching data....", error);
+  }
 };
 
 const getInitials = (name: string) =>
@@ -513,14 +531,14 @@ const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const [imageIndex, setImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const images =
-    product.images && product.images.length > 0 ? product.images : [];
+  const images = product.images?.length > 0 ? product.images : [];
 
   return (
     <>
       <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(15,23,42,0.12)]">
-        {/* Image area */}
+        {/* Image */}
         <div className="relative h-40 overflow-hidden bg-gradient-to-br from-amber-50 to-orange-50 lg:h-44">
           {images.length > 0 ? (
             <>
@@ -535,20 +553,20 @@ const ProductCard: React.FC<ProductCardProps> = ({
                 }}
               />
               {images.length > 1 && (
-                <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
-                  {images.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setImageIndex(i)}
-                      className={`h-1.5 rounded-full transition-all duration-200 ${
-                        i === imageIndex ? "w-4 bg-white" : "w-1.5 bg-white/50"
-                      }`}
-                    />
-                  ))}
-                </div>
-              )}
-              {images.length > 1 && (
                 <>
+                  <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
+                    {images.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setImageIndex(i)}
+                        className={`h-1.5 rounded-full transition-all duration-200 ${
+                          i === imageIndex
+                            ? "w-4 bg-white"
+                            : "w-1.5 bg-white/50"
+                        }`}
+                      />
+                    ))}
+                  </div>
                   <button
                     onClick={() =>
                       setImageIndex(
@@ -573,7 +591,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           ) : (
             <div
               className="flex h-full items-center justify-center cursor-pointer"
-              onClick={() => setLightboxOpen(true)}
+              onClick={() => setModalOpen(true)}
             >
               <div className="text-5xl font-black text-amber-300">
                 {product.name.charAt(0).toUpperCase()}
@@ -581,6 +599,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           )}
 
+          {/* Badges */}
           <div className="absolute left-3 top-3 flex flex-col gap-1">
             {product.isVerified && (
               <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow">
@@ -597,13 +616,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Content */}
         <div className="flex flex-1 flex-col gap-2 p-3">
-          {/* Name */}
           <h4 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900">
             {product.name}
           </h4>
 
-          {/* Price + Photos */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-end justify-between">
             <div className="flex flex-col">
               <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
                 Price
@@ -623,37 +640,192 @@ const ProductCard: React.FC<ProductCardProps> = ({
             )}
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 mt-auto">
-            <button
-              onClick={onAddToCart}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold text-white shadow-sm transition active:scale-95"
-style={{ background: "linear-gradient(110deg, #f97316, #1a3a6b)" }}
-            >
-              <i className="pi pi-shopping-cart text-xs" />
-              Add to Cart
-            </button>
-
-            <a
-              href={buildWhatsAppShareUrl(
-                storeWhatsapp,
-                `Hi, I am interested in *${product.name}* from *${storeName}*.\n\n${product.description}\n\nPrice: ₹${product.sellingPrice}`,
-              )}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm transition hover:bg-emerald-600"
-              title="Enquire on WhatsApp"
-            >
-              <i className="pi pi-whatsapp text-sm" />
-            </a>
-          </div>
+          {/* View Product Button */}
+          <button
+            onClick={() => setModalOpen(true)}
+            className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white shadow-sm transition active:scale-95 hover:opacity-90"
+            style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
+          >
+            <i className="pi pi-eye text-xs" />
+            View Product
+          </button>
         </div>
       </article>
 
-      {/* Product image lightbox */}
+      {/* ── Product Detail Modal ── */}
+      {modalOpen && (
+        <div
+          className="fixed inset-0 z-[1002] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+          onClick={() => setModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top gradient bar */}
+            <div
+              className="h-1 w-full"
+              style={{
+                background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+              }}
+            />
+
+            {/* Close */}
+            <button
+              onClick={() => setModalOpen(false)}
+              className="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow border border-slate-100 text-slate-400 hover:text-slate-700 transition"
+            >
+              <i className="pi pi-times text-sm" />
+            </button>
+
+            {/* Image */}
+            <div className="relative h-48 w-full overflow-hidden bg-slate-100">
+              {images.length > 0 ? (
+                <>
+                  <img
+                    src={images[imageIndex]}
+                    alt={product.name}
+                    className="h-full w-full object-cover"
+                    onError={(e: any) => {
+                      e.target.src =
+                        "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=600&h=400&fit=crop";
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+
+                  {/* Image nav dots */}
+                  {images.length > 1 && (
+                    <>
+                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                        {images.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setImageIndex(i)}
+                            className={`h-1.5 rounded-full transition-all ${
+                              i === imageIndex
+                                ? "w-4 bg-white"
+                                : "w-1.5 bg-white/50"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <button
+                        onClick={() =>
+                          setImageIndex(
+                            (imageIndex - 1 + images.length) % images.length,
+                          )
+                        }
+                        className="absolute left-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 transition"
+                      >
+                        <i className="pi pi-chevron-left text-xs" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          setImageIndex((imageIndex + 1) % images.length)
+                        }
+                        className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 transition"
+                      >
+                        <i className="pi pi-chevron-right text-xs" />
+                      </button>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+                  <span className="text-6xl font-black text-slate-300">
+                    {product.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+
+              {/* Badges */}
+              <div className="absolute left-3 top-3 flex gap-1.5">
+                {product.isVerified && (
+                  <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold uppercase text-white shadow">
+                    ✓ Verified
+                  </span>
+                )}
+                {!product.isActive && (
+                  <span className="rounded-full bg-slate-700 px-2.5 py-0.5 text-[10px] font-bold uppercase text-white">
+                    Unavailable
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 pt-4 pb-5 space-y-4">
+              {/* Name + Price row */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
+                    {storeName}
+                  </p>
+                  <h2 className="text-lg font-black text-slate-900 leading-tight line-clamp-2">
+                    {product.name}
+                  </h2>
+                </div>
+                <div className="shrink-0 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-right">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-amber-400 leading-none mb-0.5">
+                    Price
+                  </p>
+                  <p className="text-lg font-black text-amber-600 leading-none">
+                    ₹{product.sellingPrice.toLocaleString("en-IN")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Description */}
+              {product.description && (
+                <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+                    Description
+                  </p>
+                  <p className="text-sm text-slate-600 leading-relaxed line-clamp-3">
+                    {product.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* WhatsApp */}
+
+                <a
+                  href={buildWhatsAppShareUrl(
+                    storeWhatsapp,
+                    `Hi, I am interested in *${product.name}* from *${storeName}*.\n\n${product.description ? product.description + "\n\n" : ""}Price: ₹${product.sellingPrice}`,
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-600 active:scale-95"
+                >
+                  <i className="pi pi-whatsapp text-base" />
+                  WhatsApp
+                </a>
+
+                {/* Call */}
+
+                <a
+                  href={`tel:${storeWhatsapp}`}
+                  className="flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white shadow-sm transition active:scale-95"
+                  style={{
+                    background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                  }}
+                >
+                  <i className="pi pi-phone text-base" />
+                  Call Store
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Image Lightbox ── */}
       {lightboxOpen && images.length > 0 && (
         <div
-          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/95"
+          className="fixed inset-0 z-[1003] flex items-center justify-center bg-black/95"
           onClick={() => setLightboxOpen(false)}
         >
           <button
@@ -765,13 +937,24 @@ const ReviewModal: React.FC<ReviewModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100" style={{ background: "linear-gradient(110deg, #eef4ff, #f0f6ff)" }}>
+        <div
+          className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100"
+          style={{ background: "linear-gradient(110deg, #eef4ff, #f0f6ff)" }}
+        >
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl shadow-sm" style={{ background: "linear-gradient(135deg, #1a3a6b, #2196d3)" }}>
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-xl shadow-sm"
+              style={{
+                background: "linear-gradient(135deg, #1a3a6b, #2196d3)",
+              }}
+            >
               <i className="pi pi-star-fill text-white text-xs" />
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest leading-none" style={{ color: "#1a3a6b" }}>
+              <p
+                className="text-[10px] font-bold uppercase tracking-widest leading-none"
+                style={{ color: "#1a3a6b" }}
+              >
                 Rate & Review
               </p>
               <h2
@@ -881,7 +1064,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({
             onClick={async () => await onSubmit(rating, comment)}
             disabled={submitting || rating === 0 || comment.trim().length === 0}
             className="flex flex-[2] items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
-style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
+            style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
           >
             {submitting ? (
               <>
@@ -901,12 +1084,247 @@ style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
   );
 };
 
+function RelatedStoresSlider({
+  stores,
+  loading,
+}: {
+  stores: any[];
+  loading: boolean;
+}) {
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const autoRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const CARD_WIDTH = 220; // px — card width + gap
+
+  const startAuto = useCallback(() => {
+    if (autoRef.current) clearInterval(autoRef.current);
+    autoRef.current = setInterval(() => {
+      if (!sliderRef.current) return;
+      const { scrollLeft, scrollWidth, clientWidth } = sliderRef.current;
+      const atEnd = scrollLeft + clientWidth >= scrollWidth - 10;
+      sliderRef.current.scrollTo({
+        left: atEnd ? 0 : scrollLeft + CARD_WIDTH,
+        behavior: "smooth",
+      });
+    }, 2800);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && stores.length > 1) startAuto();
+    return () => {
+      if (autoRef.current) clearInterval(autoRef.current);
+    };
+  }, [loading, stores.length, startAuto]);
+
+  const scroll = (dir: "left" | "right") => {
+    if (!sliderRef.current) return;
+    sliderRef.current.scrollBy({
+      left: dir === "left" ? -CARD_WIDTH * 2 : CARD_WIDTH * 2,
+      behavior: "smooth",
+    });
+    startAuto(); // reset timer on manual scroll
+  };
+
+  return (
+    <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <div
+            className="flex h-7 w-7 items-center justify-center rounded-lg"
+            style={{ background: "linear-gradient(135deg, #1a3a6b, #2196d3)" }}
+          >
+            <i className="pi pi-th-large text-white text-xs" />
+          </div>
+          <h2 className="text-base font-black text-slate-900">
+            Related Stores
+          </h2>
+          {!loading && (
+            <span className="rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-500">
+              {stores.length} found
+            </span>
+          )}
+        </div>
+
+        {/* Scroll arrows */}
+        {!loading && stores.length > 1 && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => scroll("left")}
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition"
+            >
+              <i className="pi pi-chevron-left text-[11px] text-slate-500" />
+            </button>
+            <button
+              onClick={() => scroll("right")}
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition"
+            >
+              <i className="pi pi-chevron-right text-[11px] text-slate-500" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Slider */}
+      <div className="relative">
+        {/* Left fade */}
+        <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-8 bg-gradient-to-r from-white to-transparent" />
+        {/* Right fade */}
+        <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-8 bg-gradient-to-l from-white to-transparent" />
+
+        <div
+          ref={sliderRef}
+          className="flex gap-3 overflow-x-auto scroll-smooth p-4"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          onMouseEnter={() => {
+            if (autoRef.current) clearInterval(autoRef.current);
+          }}
+          onMouseLeave={() => {
+            if (!loading && stores.length > 1) startAuto();
+          }}
+        >
+          {loading
+            ? Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="animate-pulse shrink-0 rounded-xl border border-slate-100 overflow-hidden"
+                  style={{ width: 200 }}
+                >
+                  <div className="h-32 bg-slate-100" />
+                  <div className="p-3 space-y-2">
+                    <div className="h-3 w-3/4 rounded-full bg-slate-100" />
+                    <div className="h-2.5 w-1/2 rounded-full bg-slate-100" />
+                    <div className="h-2.5 w-2/3 rounded-full bg-slate-100" />
+                  </div>
+                </div>
+              ))
+            : stores.map((rs) => {
+                const rsRating =
+                  rs.reviews?.length > 0
+                    ? rs.reviews.reduce(
+                        (sum: number, r: any) => sum + (Number(r.rating) || 0),
+                        0,
+                      ) / rs.reviews.length
+                    : 0;
+                const rsOpen = isStoreOpenNow(
+                  rs.timing?.open || "",
+                  rs.timing?.close || "",
+                );
+                const rsLocation = [rs.address?.area, rs.address?.state]
+                  .filter(Boolean)
+                  .join(", ");
+
+                return (
+                  <Link key={rs._id} href={`/store/${rs._id}`}>
+                    <article
+                      className="group flex shrink-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
+                      style={{ width: 200 }}
+                    >
+                      {/* Image */}
+                      <div className="relative h-32 overflow-hidden bg-slate-100">
+                        {rs.images?.[0] ? (
+                          <img
+                            src={rs.images[0]}
+                            alt={rs.storeName}
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                            onError={(e: any) => {
+                              e.target.src =
+                                "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=300&fit=crop";
+                            }}
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-500 to-blue-600 text-white">
+                            <span className="text-2xl font-black">
+                              {getInitials(rs.storeName)}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+
+                        {/* Open/Closed */}
+                        <div
+                          className={`absolute bottom-2 left-2 flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
+                            rsOpen
+                              ? "bg-emerald-500 text-white"
+                              : "bg-black/60 text-slate-300"
+                          }`}
+                        >
+                          <span
+                            className={`h-1 w-1 rounded-full ${rsOpen ? "bg-white" : "bg-slate-400"}`}
+                          />
+                          {rsOpen ? "Open" : "Closed"}
+                        </div>
+
+                        {/* Verified */}
+                        {rs.isVerify && (
+                          <div className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 shadow">
+                            <i className="pi pi-verified text-[9px] text-white" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex flex-1 flex-col gap-1.5 p-3">
+                        <h4 className="line-clamp-1 text-[13px] font-bold leading-snug text-slate-900">
+                          {rs.storeName}
+                        </h4>
+
+                        {rs.storeType && (
+                          <p className="truncate text-[10px] font-medium text-slate-400">
+                            {rs.storeType}
+                          </p>
+                        )}
+
+                        {/* Stars */}
+                        <div className="flex items-center gap-1">
+                          <div className="flex">
+                            {Array.from({ length: 5 }, (_, i) => (
+                              <i
+                                key={i}
+                                className={`pi pi-star-fill text-[9px] ${
+                                  i < Math.round(rsRating)
+                                    ? "text-amber-400"
+                                    : "text-slate-200"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[9px] font-semibold text-slate-400">
+                            {rsRating > 0 ? rsRating.toFixed(1) : "—"}
+                            {rs.reviews?.length > 0 && (
+                              <span className="text-slate-300">
+                                {" "}
+                                ({rs.reviews.length})
+                              </span>
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Location */}
+                        <p className="mt-auto truncate text-[10px] text-slate-400 flex items-center gap-1">
+                          <i className="pi pi-map-marker text-[9px] text-slate-300" />
+                          {rsLocation || "Location not set"}
+                        </p>
+                      </div>
+                    </article>
+                  </Link>
+                );
+              })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function StoreDetails() {
   const params = useParams();
   const storeId = params?.storeid?.[0];
   const dispatch = useAppDispatch();
-
+  const [ads, setAds] = useState<ProductAd[]>([]);
+  const [relatedStores, setRelatedStores] = useState<any[]>([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
   const [store, setStore] = useState<Store | null>(null);
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -936,7 +1354,6 @@ export default function StoreDetails() {
   const [activeTab, setActiveTab] = useState<"products" | "reviews" | "hours">(
     "products",
   );
-  const [ads, setAds] = useState<Ad[]>([]);
   const [adsLoading, setAdsLoading] = useState(true);
   const adsScrollRef = useRef<HTMLDivElement>(null);
   const scrollAds = (dir: "left" | "right") => {
@@ -1023,12 +1440,24 @@ export default function StoreDetails() {
   }, []);
 
   useEffect(() => {
+    if (!storeId) return;
+    setRelatedLoading(true);
+    axiosInstance
+      .get(`/api/register/related-stores/${storeId}`)
+      .then((res) => setRelatedStores(res.data.stores || []))
+      .catch(() => setRelatedStores([]))
+      .finally(() => setRelatedLoading(false));
+  }, [storeId]);
+
+  useEffect(() => {
     axiosInstance
       .get("/api/ads")
       .then((res) => {
         const sorted = (res.data.ads || [])
-          .filter((a: Ad) => a.isActive)
-          .sort((a: Ad, b: Ad) => (a.rank ?? 99) - (b.rank ?? 99));
+          .filter((a: ProductAd) => a.isActive && a.productId?.isActive)
+          .sort(
+            (a: ProductAd, b: ProductAd) => (a.rank ?? 99) - (b.rank ?? 99),
+          );
         setAds(sorted);
       })
       .catch(() => setAds([]))
@@ -1094,7 +1523,10 @@ export default function StoreDetails() {
         <Header />
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
-            <i className="pi pi-spin pi-spinner mb-4 block text-5xl" style={{ color: "#2196d3" }} />
+            <i
+              className="pi pi-spin pi-spinner mb-4 block text-5xl"
+              style={{ color: "#2196d3" }}
+            />
             <p className="font-semibold text-slate-500">
               Checking sign-in status…
             </p>
@@ -1113,10 +1545,18 @@ export default function StoreDetails() {
           <div className="fixed inset-0 z-30 bg-slate-950/50 backdrop-blur-sm" />
           <div className="relative z-40 w-full max-w-md overflow-hidden rounded-3xl border border-white/80 bg-white p-8 shadow-2xl">
             <div className="text-center">
-              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full text-white" style={{ background: "linear-gradient(135deg, #1a3a6b, #2196d3)" }}>
+              <div
+                className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full text-white"
+                style={{
+                  background: "linear-gradient(135deg, #1a3a6b, #2196d3)",
+                }}
+              >
                 <i className="pi pi-lock text-2xl" />
               </div>
-              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#2196d3" }}>
+              <p
+                className="text-xs font-bold uppercase tracking-widest"
+                style={{ color: "#2196d3" }}
+              >
                 Sign in required
               </p>
               <h1 className="mt-3 text-2xl font-black text-slate-950">
@@ -1155,7 +1595,10 @@ export default function StoreDetails() {
         <Header />
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
-            <i className="pi pi-spin pi-spinner mb-4 block text-5xl" style={{ color: "#2196d3" }} />
+            <i
+              className="pi pi-spin pi-spinner mb-4 block text-5xl"
+              style={{ color: "#2196d3" }}
+            />
             <p className="font-semibold text-slate-500">
               Loading store details…
             </p>
@@ -1255,7 +1698,10 @@ export default function StoreDetails() {
                 <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
                   <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                      <i className="pi pi-shopping-bag" style={{ color: "#f97316" }} />
+                      <i
+                        className="pi pi-shopping-bag"
+                        style={{ color: "#f97316" }}
+                      />
                       Products
                       <span className="text-sm font-normal text-slate-500">
                         ({products.length})
@@ -1290,7 +1736,10 @@ export default function StoreDetails() {
                           <button
                             onClick={() => setShowAllProducts(true)}
                             className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-bold text-white shadow-sm transition active:scale-95"
-style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
+                            style={{
+                              background:
+                                "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                            }}
                           >
                             <i className="pi pi-plus-circle text-sm" />
                             Load More
@@ -1356,6 +1805,7 @@ style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
                       href={store.website}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => trackStoreAction(store._id, "WEBSITE")}
                       className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-amber-300 hover:bg-amber-50"
                     >
                       <i className="pi pi-globe text-blue-500 text-xs" />{" "}
@@ -1370,6 +1820,7 @@ style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
                       )}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => trackStoreAction(store._id, "WHATSAPP")}
                       className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50"
                     >
                       <i className="pi pi-whatsapp text-emerald-500 text-xs" />{" "}
@@ -1379,18 +1830,18 @@ style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
                   {store.contactNo && (
                     <a
                       href={`tel:${store.contactNo}`}
+                      onClick={() => trackStoreAction(store._id, "CALL")}
                       className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50"
                     >
                       <i className="pi pi-phone text-blue-500 text-xs" /> Call
                     </a>
                   )}
-
-                  {/* Directions Button */}
                   {store.lat && store.long && (
                     <a
                       href={`https://www.google.com/maps/dir/?api=1&destination=${store.lat},${store.long}`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => trackStoreAction(store._id, "DIRECTION")}
                       className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50"
                     >
                       <svg
@@ -1408,7 +1859,10 @@ style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
                     </a>
                   )}
                   <button
-                    onClick={() => setIsShareOpen(true)}
+                    onClick={() => {
+                      trackStoreAction(store._id, "SHARE");
+                      setIsShareOpen(true);
+                    }}
                     style={{ borderRadius: "9999px" }}
                     className="inline-flex items-center gap-1.5 border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
                   >
@@ -1423,7 +1877,9 @@ style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
                     <button
                       onClick={() => setIsReviewModalOpen(true)}
                       className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white shadow-sm transition active:scale-95"
-style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
+                      style={{
+                        background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                      }}
                     >
                       <i className="pi pi-star-fill text-sm" />
                       Write a Review
@@ -1494,6 +1950,228 @@ style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
                     </>
                   )}
                 </div>
+
+                {(adsLoading || ads.length > 0) && (
+                  <div className="border-t border-slate-100 overflow-hidden">
+                    {/* Animated Sponsored Header */}
+                    <div
+                      className="relative flex items-center justify-between px-3 py-2 overflow-hidden"
+                      style={{
+                        background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                      }}
+                    >
+                      <div
+                        className="pointer-events-none absolute inset-0"
+                        style={{
+                          background:
+                            "linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%)",
+                          animation: "adShimmer 2.5s ease-in-out infinite",
+                        }}
+                      />
+                      <div className="flex items-center gap-1.5 relative z-10">
+                        <span className="relative flex h-2 w-2">
+                          <span
+                            className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"
+                            style={{
+                              animation:
+                                "ping 1.2s cubic-bezier(0,0,0.2,1) infinite",
+                            }}
+                          />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-300" />
+                        </span>
+                        <span
+                          className="text-[10px] font-black uppercase tracking-widest text-white"
+                          style={{
+                            animation: "sponsoredPulse 3s ease-in-out infinite",
+                          }}
+                        >
+                          Sponsored
+                        </span>
+                      </div>
+                      <span
+                        className="relative z-10 rounded bg-amber-400 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-900"
+                        style={{ animation: "adBlink 2s ease-in-out infinite" }}
+                      >
+                        AD
+                      </span>
+                    </div>
+
+                    <style>{`
+      @keyframes adShimmer {
+        0%   { transform: translateX(-100%); }
+        60%  { transform: translateX(100%); }
+        100% { transform: translateX(100%); }
+      }
+      @keyframes sponsoredPulse {
+        0%, 100% { opacity: 1;   letter-spacing: 0.15em; }
+        50%       { opacity: 0.7; letter-spacing: 0.22em; }
+      }
+      @keyframes adBlink {
+        0%, 100% { opacity: 1;   transform: scale(1); }
+        40%       { opacity: 0.5; transform: scale(0.92); }
+        60%       { opacity: 1;   transform: scale(1.08); }
+      }
+      @keyframes ping {
+        75%, 100% { transform: scale(2); opacity: 0; }
+      }
+      @keyframes adCardIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes imgPulse {
+        0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(33,150,211,0); }
+        50%       { transform: scale(1.07); box-shadow: 0 0 0 4px rgba(33,150,211,0.18); }
+      }
+      @keyframes namePulse {
+        0%, 100% { transform: scale(1);    opacity: 1; }
+        50%       { transform: scale(1.04); opacity: 0.75; }
+      }
+    `}</style>
+
+                    <div className="divide-y divide-slate-100">
+                      {adsLoading
+                        ? Array.from({ length: 2 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="flex gap-2.5 px-3 py-2.5 animate-pulse"
+                            >
+                              <div className="h-14 w-14 shrink-0 rounded-lg bg-slate-100" />
+                              <div className="flex-1 space-y-1.5 py-0.5">
+                                <div className="h-2 w-12 rounded-full bg-slate-100" />
+                                <div className="h-2.5 w-3/4 rounded-full bg-slate-100" />
+                                <div className="h-2 w-1/2 rounded-full bg-slate-100" />
+                              </div>
+                            </div>
+                          ))
+                        : ads.slice(0, 5).map((ad, idx) => {
+                            const product = ad.productId;
+                            const productImage = product.images?.[0];
+                            const storeLink = product.storeId
+                              ? `/store/${product.storeId._id}`
+                              : undefined;
+
+                            // Each card gets its own staggered animation delay
+                            const imgDelay = `${idx * 400}ms`;
+                            const nameDelay = `${idx * 400 + 200}ms`;
+
+                            const cardContent = (
+                              <div
+                                className="group relative flex gap-2.5 px-3 py-2.5 transition-all duration-200 hover:bg-amber-50"
+                                style={{
+                                  animation: "adCardIn 0.4s ease both",
+                                  animationDelay: `${idx * 80}ms`,
+                                }}
+                              >
+                                {/* Left accent bar on hover */}
+                                <div
+                                  className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                                  style={{
+                                    background:
+                                      "linear-gradient(180deg, #1a3a6b, #2196d3)",
+                                  }}
+                                />
+
+                                {/* Image — scale pulse */}
+                                <div
+                                  className="relative shrink-0 overflow-hidden rounded-lg bg-slate-100 shadow-sm"
+                                  style={{
+                                    width: 56,
+                                    height: 56,
+                                    animation: `imgPulse 2.8s ease-in-out infinite`,
+                                    animationDelay: imgDelay,
+                                  }}
+                                >
+                                  {productImage ? (
+                                    <img
+                                      src={productImage}
+                                      alt={product.name}
+                                      className="h-full w-full object-cover"
+                                      onError={(e: any) => {
+                                        e.target.style.display = "none";
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100">
+                                      <i className="pi pi-box text-lg text-amber-300" />
+                                    </div>
+                                  )}
+                                  {product.isVerified && (
+                                    <div className="absolute right-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 shadow">
+                                      <i className="pi pi-check text-[7px] text-white" />
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Text */}
+                                <div className="min-w-0 flex-1">
+                                  {product.storeId && (
+                                    <p className="truncate text-[9px] font-bold uppercase tracking-widest text-slate-400 leading-none mb-0.5">
+                                      {product.storeId.storeName}
+                                    </p>
+                                  )}
+
+                                  {/* Product name — scale + opacity pulse */}
+                                  <p
+                                    className="line-clamp-1 text-[12px] font-bold leading-tight text-slate-800 transition-colors group-hover:text-blue-700"
+                                    style={{
+                                      display: "inline-block",
+                                      animation: `namePulse 2.8s ease-in-out infinite`,
+                                      animationDelay: nameDelay,
+                                      transformOrigin: "left center",
+                                    }}
+                                  >
+                                    {product.name}
+                                  </p>
+
+                                  {product.description && (
+                                    <p className="line-clamp-1 text-[10px] text-slate-400 mt-0.5">
+                                      {product.description}
+                                    </p>
+                                  )}
+
+                                  <div className="mt-1 flex items-center justify-between">
+                                    {product.sellingPrice !== undefined && (
+                                      <span className="text-[11px] font-black text-amber-600">
+                                        ₹
+                                        {product.sellingPrice.toLocaleString(
+                                          "en-IN",
+                                        )}
+                                      </span>
+                                    )}
+                                    {storeLink && (
+                                      <span className="flex items-center gap-0.5 text-[9px] font-semibold text-blue-500 transition-all group-hover:gap-1.5 group-hover:underline">
+                                        View{" "}
+                                        <i className="pi pi-arrow-right text-[8px]" />
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+
+                            return storeLink ? (
+                              <a
+                                key={ad._id}
+                                href={storeLink}
+                                className="block"
+                              >
+                                {cardContent}
+                              </a>
+                            ) : (
+                              <div key={ad._id}>{cardContent}</div>
+                            );
+                          })}
+                    </div>
+
+                    {!adsLoading && ads.length > 0 && (
+                      <div className="border-t border-slate-100 bg-slate-50 px-3 py-1.5 text-center">
+                        <p className="text-[9px] text-slate-300">
+                          Sponsored · AMP Shopping
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </aside>
             </div>
 
@@ -1502,7 +2180,10 @@ style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
               <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
                 <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
                   <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <i className="pi pi-shopping-bag" style={{ color: "#f97316" }} />
+                    <i
+                      className="pi pi-shopping-bag"
+                      style={{ color: "#f97316" }}
+                    />
                     More Products
                   </h2>
                   <button
@@ -1648,7 +2329,10 @@ style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#1a3a6b" }}>
+                    <p
+                      className="text-xs font-bold uppercase tracking-widest"
+                      style={{ color: "#1a3a6b" }}
+                    >
                       Store Location
                     </p>
                     <h2 className="mt-0.5 text-lg font-black text-slate-900">
@@ -1744,7 +2428,10 @@ style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
               >
                 <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#2196d3" }}>
+                    <p
+                      className="text-xs font-bold uppercase tracking-widest"
+                      style={{ color: "#2196d3" }}
+                    >
                       Customer reviews
                     </p>
                     <h2
@@ -1818,137 +2505,16 @@ style={{ background: "linear-gradient(110deg, #1a3a6b, #2196d3)" }}
             </div>
           )}
 
+          {/* ── Related Stores ── */}
+          {(relatedLoading || relatedStores.length > 0) && (
+            <RelatedStoresSlider
+              stores={relatedStores}
+              loading={relatedLoading}
+            />
+          )}
+
           {/* ADS — full width, দুই column জুড়ে */}
           {/* ADS SECTION — Dynamic */}
-          <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-black text-slate-900">
-                  Featured Ads
-                </h2>
-                <span className="rounded-sm bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 uppercase tracking-wide">
-                  Sponsored
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => scrollAds("left")}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-amber-50 hover:border-amber-300 hover:text-amber-600"
-                >
-                  <i className="pi pi-arrow-left text-xs" />
-                </button>
-                <button
-                  onClick={() => scrollAds("right")}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-amber-50 hover:border-amber-300 hover:text-amber-600"
-                >
-                  <i className="pi pi-arrow-right text-xs" />
-                </button>
-              </div>
-            </div>
-
-            <div className="relative">
-              <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-8 bg-gradient-to-r from-white to-transparent" />
-              <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-8 bg-gradient-to-l from-white to-transparent" />
-
-              <div
-                ref={adsScrollRef}
-                className="flex gap-0 overflow-x-auto scrollbar-hide divide-x divide-slate-100"
-              >
-                {adsLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex w-[170px] shrink-0 flex-col p-3 sm:w-[190px] animate-pulse"
-                    >
-                      <div className="mb-2.5 h-[140px] w-full rounded-lg bg-slate-100 sm:h-[155px]" />
-                      <div className="h-3 w-3/4 rounded-full bg-slate-100 mb-2" />
-                      <div className="h-3 w-1/2 rounded-full bg-slate-100 mb-1" />
-                      <div className="h-3 w-2/3 rounded-full bg-slate-100" />
-                    </div>
-                  ))
-                ) : ads.length === 0 ? (
-                  <div className="flex w-full items-center justify-center py-10 px-6 text-sm text-slate-400 gap-2">
-                    <i className="pi pi-megaphone text-slate-300 text-xl" />
-                    No sponsored ads available
-                  </div>
-                ) : (
-                  ads.map((ad) => {
-                    const hasValidUrl =
-                      !!ad.redirectUrl &&
-                      ad.redirectUrl !== "https://" &&
-                      ad.redirectUrl.startsWith("http");
-
-                    const inner = (
-                      <>
-                        <span className="absolute left-2 top-2 z-10 rounded-sm bg-white border border-slate-200 px-1 py-0.5 text-[9px] font-bold text-slate-400 leading-none">
-                          AD
-                        </span>
-
-                        {ad.rank && ad.rank <= 3 && (
-                          <span className="absolute right-2 top-2 z-10 rounded-sm bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-white leading-none">
-                            #{ad.rank} Top
-                          </span>
-                        )}
-
-                        <div className="relative mb-2.5 h-[140px] w-full overflow-hidden rounded-lg bg-slate-50 flex items-center justify-center sm:h-[155px]">
-                          {ad.image ? (
-                            <img
-                              src={ad.image}
-                              alt={ad.title}
-                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                              onError={(e: any) => {
-                                e.target.style.display = "none";
-                              }}
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100">
-                              <i className="pi pi-image text-3xl text-amber-300" />
-                            </div>
-                          )}
-                        </div>
-
-                        <p className="mb-1 text-xs font-bold text-slate-800 leading-tight line-clamp-2">
-                          {ad.title}
-                        </p>
-
-                        {ad.description && (
-                          <p className="text-[10px] text-slate-500 leading-tight line-clamp-2 mb-1">
-                            {ad.description}
-                          </p>
-                        )}
-
-                        {hasValidUrl && (
-                          <p className="mt-auto pt-2 text-[10px] font-semibold text-amber-600 flex items-center gap-1">
-                            Visit now{" "}
-                            <i className="pi pi-external-link text-[8px]" />
-                          </p>
-                        )}
-                      </>
-                    );
-
-                    const cls =
-                      "group relative flex w-[170px] shrink-0 flex-col p-3 transition hover:bg-slate-50 sm:w-[190px]";
-
-                    return hasValidUrl ? (
-                      <a
-                        key={ad._id}
-                        href={ad.redirectUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={cls}
-                      >
-                        {inner}
-                      </a>
-                    ) : (
-                      <div key={ad._id} className={cls}>
-                        {inner}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
         </div>
       </main>
 

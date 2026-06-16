@@ -48,6 +48,7 @@ export default function Header() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [storeSearch, setStoreSearch] = useState("");
+  const [stateSearch, setStateSearch] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -333,11 +334,32 @@ export default function Header() {
         {/* Dropdown */}
         {stateDropdownOpen && (
           <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[999] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+            {/* 🔍 Search Input */}
+            <div className="p-2 border-b border-slate-100">
+              <input
+                type="text"
+                value={stateSearch}
+                onChange={(e) => setStateSearch(e.target.value)}
+                placeholder="Type to filter..."
+                autoFocus
+                className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium outline-none transition-all focus:bg-white"
+                onFocusCapture={(e) => {
+                  e.target.style.borderColor = AMP_SKY;
+                  e.target.style.boxShadow = `0 0 0 3px rgba(33,150,211,0.12)`;
+                }}
+                onBlurCapture={(e) => {
+                  e.target.style.borderColor = "";
+                  e.target.style.boxShadow = "";
+                }}
+              />
+            </div>
+
             {/* Clear option */}
             {locationSearch && (
               <button
                 onClick={() => {
                   setLocationSearch("");
+                  setStateSearch("");
                   setStateDropdownOpen(false);
                 }}
                 className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-2.5 text-left text-sm text-rose-500 hover:bg-rose-50 transition"
@@ -361,40 +383,53 @@ export default function Header() {
               </div>
             ) : (
               <ul className="max-h-56 overflow-y-auto">
-                {states.map((state, idx) => (
-                  <li key={state}>
-                    <button
-                      onClick={() => {
-                        setLocationSearch(state);
-                        setStateDropdownOpen(false);
-                        // Push to URL params so page.tsx picks it up
-                        const params = new URLSearchParams(
-                          window.location.search,
-                        );
-                        params.set("state", state);
-                        router.push(`/store?${params.toString()}`);
-                      }}
-                      className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-blue-50 ${
-                        locationSearch === state ? "bg-blue-50" : ""
-                      } ${idx !== states.length - 1 ? "border-b border-slate-100" : ""}`}
-                    >
-                      <span
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white"
-                        style={{ background: AMP_GRADIENT }}
+                {states
+                  .filter((state) =>
+                    state.toLowerCase().includes(stateSearch.toLowerCase()),
+                  )
+                  .map((state, idx, arr) => (
+                    <li key={state}>
+                      <button
+                        onClick={() => {
+                          setLocationSearch(state);
+                          setStateSearch(""); // ← search clear
+                          setStateDropdownOpen(false);
+                          const params = new URLSearchParams(
+                            window.location.search,
+                          );
+                          params.set("state", state);
+                          router.push(`/store?${params.toString()}`);
+                        }}
+                        className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-blue-50 ${
+                          locationSearch === state ? "bg-blue-50" : ""
+                        } ${idx !== arr.length - 1 ? "border-b border-slate-100" : ""}`}
                       >
-                        {state.charAt(0).toUpperCase()}
-                      </span>
-                      <span className="font-medium text-slate-800">
-                        {state}
-                      </span>
-                      {locationSearch === state && (
-                        <span className="ml-auto" style={{ color: AMP_SKY }}>
-                          ✓
+                        <span
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white"
+                          style={{ background: AMP_GRADIENT }}
+                        >
+                          {state.charAt(0).toUpperCase()}
                         </span>
-                      )}
-                    </button>
+                        <span className="font-medium text-slate-800">
+                          {state}
+                        </span>
+                        {locationSearch === state && (
+                          <span className="ml-auto" style={{ color: AMP_SKY }}>
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+
+                {/* No results */}
+                {states.filter((s) =>
+                  s.toLowerCase().includes(stateSearch.toLowerCase()),
+                ).length === 0 && (
+                  <li className="px-4 py-4 text-center text-sm text-slate-400">
+                    No state found for &quot;{stateSearch}&quot;
                   </li>
-                ))}
+                )}
               </ul>
             )}
           </div>

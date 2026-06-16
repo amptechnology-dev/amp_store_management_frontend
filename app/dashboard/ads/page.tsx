@@ -14,13 +14,28 @@ import { Dialog } from "primereact/dialog";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import AdsForm from "@/components/ads/AdsForm";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type ProductInfo = {
+  _id: string;
+  name: string;
+  images?: string[];
+  description?: string;
+  sellingPrice?: number;
+  isActive?: boolean;
+  isVerified?: boolean;
+  storeId?: {
+    _id: string;
+    storeName: string;
+  };
+};
+
 type AdRow = {
   _id: string;
-  title: string;
-  description?: string;
-  image?: string;
-  redirectUrl?: string;
+  productId?: ProductInfo;
+  storeId?: string;
   rank?: number;
+  expiryDate?: string;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -66,7 +81,7 @@ function Page() {
   // ── Delete ─────────────────────────────────────────────────────────────────
   const handleDelete = (rowData: AdRow) => {
     confirmDialog({
-      message: `Are you sure you want to delete "${rowData.title}"?`,
+      message: `Are you sure you want to delete this ad?`,
       header: "Delete Confirmation",
       icon: "pi pi-exclamation-triangle",
       acceptClassName: "p-button-danger",
@@ -97,68 +112,129 @@ function Page() {
     if (!debouncedSearch) return adsData;
     const term = debouncedSearch.toLowerCase();
     return adsData.filter((ad) =>
-      [ad.title, ad.description, ad.redirectUrl].some((value) =>
-        String(value || "")
-          .toLowerCase()
-          .includes(term),
-      ),
+      [
+        ad.productId?.name,
+        ad.productId?.description,
+        ad.productId?.storeId?.storeName,
+      ].some((value) =>
+        String(value || "").toLowerCase().includes(term)
+      )
     );
   }, [adsData, debouncedSearch]);
 
   // ── Column Templates ───────────────────────────────────────────────────────
-  const adImageTemplate = (rowData: AdRow) => {
-    if (rowData.image) {
+
+  // Product image
+  const productImageTemplate = (rowData: AdRow) => {
+    const img = rowData.productId?.images?.[0];
+    if (img) {
       return (
         <div className="h-14 w-20 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 mx-auto">
           <img
-            src={rowData.image}
-            alt={rowData.title}
+            src={img}
+            alt={rowData.productId?.name}
             className="h-full w-full object-cover"
           />
         </div>
       );
     }
     return (
-      <div className="h-14 w-20 rounded-xl flex items-center justify-center bg-gray-200 text-gray-400 mx-auto">
+      <div className="h-14 w-20 rounded-xl flex items-center justify-center bg-gray-100 text-gray-400 mx-auto">
         <i className="pi pi-image text-2xl" />
       </div>
     );
   };
 
-  const statusTemplate = (rowData: AdRow) => (
-    <span
-      className={`px-2 py-1 rounded-full text-xs font-medium ${
-        rowData.isActive
-          ? "bg-green-100 text-green-800"
-          : "bg-red-100 text-red-800"
-      }`}
-    >
-      {rowData.isActive ? "Active" : "Inactive"}
-    </span>
-  );
+  // Product info
+  const productTemplate = (rowData: AdRow) => {
+    const p = rowData.productId;
+    if (!p) return <span className="text-gray-400 italic text-sm">—</span>;
+    return (
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <p className="text-sm font-bold text-slate-800 truncate">{p.name}</p>
+        {p.sellingPrice !== undefined && (
+          <p className="text-xs text-amber-600 font-semibold">
+            ₹{p.sellingPrice.toLocaleString("en-IN")}
+          </p>
+        )}
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {p.isVerified && (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+              ✓ Verified
+            </span>
+          )}
+          {!p.isActive && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+              Inactive
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
 
+  // Store name
+  const storeTemplate = (rowData: AdRow) => {
+    const storeName = rowData.productId?.storeId?.storeName;
+    if (!storeName)
+      return <span className="text-gray-400 italic text-sm">—</span>;
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-xs font-black text-blue-600">
+          {storeName.charAt(0).toUpperCase()}
+        </div>
+        <span className="text-sm font-semibold text-slate-700 truncate">
+          {storeName}
+        </span>
+      </div>
+    );
+  };
+
+  // Rank
   const rankTemplate = (rowData: AdRow) => (
     <span className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
       {rowData.rank ?? "—"}
     </span>
   );
 
-  const redirectUrlTemplate = (rowData: AdRow) => {
-    if (!rowData.redirectUrl) {
-      return <span className="text-sm text-gray-400 italic">No URL</span>;
-    }
+  // Expiry date
+  const expiryTemplate = (rowData: AdRow) => {
+    if (!rowData.expiryDate)
+      return <span className="text-gray-400 italic text-sm">—</span>;
+    const date = new Date(rowData.expiryDate);
+    const isExpired = date < new Date();
     return (
-      <a
-        href={rowData.redirectUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-sm text-blue-600 hover:underline truncate max-w-[220px] block"
-        title={rowData.redirectUrl}
+      <span
+        className={`text-sm font-medium ${
+          isExpired ? "text-red-500" : "text-slate-600"
+        }`}
       >
-        {rowData.redirectUrl}
-      </a>
+        {date.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })}
+        {isExpired && (
+          <span className="ml-1 text-[10px] font-bold text-red-400">
+            (Expired)
+          </span>
+        )}
+      </span>
     );
   };
+
+  // Status
+  const statusTemplate = (rowData: AdRow) => (
+    <span
+      className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+        rowData.isActive
+          ? "bg-emerald-100 text-emerald-700"
+          : "bg-red-100 text-red-600"
+      }`}
+    >
+      {rowData.isActive ? "● Active" : "● Inactive"}
+    </span>
+  );
 
   // ── Table Header ───────────────────────────────────────────────────────────
   const header = (
@@ -170,7 +246,9 @@ function Page() {
         <h2 className="text-sm sm:text-base font-semibold text-gray-800">
           Advertisements
         </h2>
-        <p className="text-xs text-gray-700">Manage all ads and banners</p>
+        <p className="text-xs text-gray-700">
+          {adsData.length} ad{adsData.length !== 1 ? "s" : ""} total
+        </p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 items-stretch sm:items-center w-full sm:w-auto">
@@ -182,7 +260,7 @@ function Page() {
           <InputText
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search ads"
+            placeholder="Search by product or store..."
             className="p-inputtext-sm w-full"
           />
         </IconField>
@@ -242,35 +320,25 @@ function Page() {
               <Column
                 header="#"
                 body={(_, options) => options.rowIndex + 1}
-                style={{ width: "60px" }}
+                style={{ width: "55px" }}
               />
 
               <Column
                 header="Image"
-                body={adImageTemplate}
+                body={productImageTemplate}
                 style={{ width: "110px" }}
               />
 
-              <Column field="title" header="Title" sortable />
-
               <Column
-                field="description"
-                header="Description"
-                body={(rowData: AdRow) => (
-                  <span className="text-sm text-gray-600">
-                    {rowData.description || (
-                      <span className="text-gray-400 italic">
-                        No description
-                      </span>
-                    )}
-                  </span>
-                )}
+                header="Product"
+                body={productTemplate}
+                style={{ minWidth: "180px" }}
               />
 
               <Column
-                header="Redirect URL"
-                body={redirectUrlTemplate}
-                style={{ width: "240px" }}
+                header="Store"
+                body={storeTemplate}
+                style={{ minWidth: "160px" }}
               />
 
               <Column
@@ -278,13 +346,19 @@ function Page() {
                 body={rankTemplate}
                 field="rank"
                 sortable
-                style={{ width: "90px" }}
+                style={{ width: "80px" }}
               />
 
               <Column
-                field="isActive"
+                header="Expiry"
+                body={expiryTemplate}
+                style={{ width: "150px" }}
+              />
+
+              <Column
                 header="Status"
                 body={statusTemplate}
+                field="isActive"
                 style={{ width: "110px" }}
               />
 
@@ -292,16 +366,16 @@ function Page() {
                 field="createdAt"
                 header="Created"
                 body={(rowData: AdRow) => (
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-gray-500">
                     {formatDate(rowData.createdAt || "")}
                   </span>
                 )}
-                style={{ width: "160px" }}
+                style={{ width: "140px" }}
               />
 
               <Column
                 header="Actions"
-                style={{ width: "160px" }}
+                style={{ width: "150px" }}
                 body={(rowData: AdRow) => (
                   <div className="flex gap-2">
                     <Button
@@ -333,12 +407,12 @@ function Page() {
           </div>
         )}
 
-        {/* ── Add / Edit Dialog ─────────────────────────────────────────── */}
+        {/* ── Dialog ── */}
         <Dialog
           header={
             <div className="flex items-center gap-3 bg-gradient-to-r from-blue-500 to-indigo-600 mb-2 p-3 rounded-t-lg">
               <div className="bg-white/20 backdrop-blur-sm p-2 rounded-lg">
-                <i className="pi pi-megaphone text-white text-xl"></i>
+                <i className="pi pi-megaphone text-white text-xl" />
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-white">
@@ -372,10 +446,6 @@ function Page() {
               setEditAdId(null);
             }}
           />
-
-          <div className="flex items-center justify-center py-10 text-gray-400">
-            <p>AdsForm component goes here</p>
-          </div>
         </Dialog>
 
         <ConfirmDialog />

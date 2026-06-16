@@ -50,6 +50,36 @@ interface Ad {
   isActive?: boolean;
 }
 
+interface RecentStore {
+  _id: string;
+  storeName: string;
+  storeType?: string;
+  images?: string[];
+  address?: { area?: string; state?: string };
+  reviews?: StoreReview[];
+  isActive?: boolean;
+  timing?: { open: string; close: string };
+  isFeatured?: boolean;
+  gstin?: string;
+}
+
+interface ProductAd {
+  _id: string;
+  productId: {
+    _id: string;
+    name: string;
+    images?: string[];
+    description?: string;
+    sellingPrice?: number;
+    isActive?: boolean;
+    isVerified?: boolean;
+    storeId?: { _id: string; storeName: string };
+  };
+  rank?: number;
+  expiryDate?: string;
+  isActive?: boolean;
+}
+
 interface Store {
   _id: string;
   storeName: string;
@@ -75,6 +105,7 @@ interface Store {
   storeUniqueId: string;
   reviews?: StoreReview[];
   createdAt?: string;
+  _distance?: number;
 }
 
 type FeedMode =
@@ -83,7 +114,8 @@ type FeedMode =
   | "topViewed"
   | "topRated"
   | "gst"
-  | "random";
+  | "random"
+  | "nearby";
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
@@ -204,6 +236,7 @@ const SERVICE_CARDS = [
 
 const FEED_MODES: Array<{ key: FeedMode; label: string; icon: string }> = [
   { key: "all", label: "All Stores", icon: "pi-th-large" },
+  { key: "nearby", label: "Nearby", icon: "pi-map-marker" }, // ← new
   { key: "featured", label: "Featured", icon: "pi-star-fill" },
   { key: "topViewed", label: "Top Viewed", icon: "pi-eye" },
   { key: "topRated", label: "Top Rated", icon: "pi-thumbs-up" },
@@ -212,6 +245,23 @@ const FEED_MODES: Array<{ key: FeedMode; label: string; icon: string }> = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const haversineKm = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
 
 const fallbackImage =
   "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&h=400&fit=crop";
@@ -306,29 +356,213 @@ const renderStars = (rating: number) =>
     />
   ));
 
+function RecentSearches() {
+  const [stores, setStores] = useState<RecentStore[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  const fetchRecent = () => {
+    axiosInstance
+      .get("/api/register/recent-search-stores")
+      .then((res) => setStores(res.data.stores || []))
+      .catch(() => setStores([]))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchRecent();
+  }, []);
+
+  const handleClearAll = async () => {
+    setClearing(true);
+    try {
+      await axiosInstance.delete("/api/register/clear-recent-searches");
+      setStores([]);
+    } catch {
+      // silent fail
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  const scroll = (dir: "left" | "right") => {
+    sliderRef.current?.scrollBy({
+      left: dir === "left" ? -320 : 320,
+      behavior: "smooth",
+    });
+  };
+
+  if (!loading && stores.length === 0) return null;
+
+  return (
+    <div className="relative">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-500">
+            <i className="pi pi-clock text-[10px] text-white" />
+          </div>
+          <h2 className="text-base font-black text-slate-900">
+            Recently Visited Stores
+          </h2>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Clear All button */}
+          <button
+            onClick={handleClearAll}
+            disabled={clearing}
+            className="flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-500 transition hover:bg-rose-100 disabled:opacity-50"
+          >
+            {clearing ? (
+              <div className="h-3 w-3 animate-spin rounded-full border border-t-transparent border-rose-400" />
+            ) : (
+              <i className="pi pi-trash text-[10px]" />
+            )}
+            {clearing ? "Clearing..." : "Clear All"}
+          </button>
+
+          {/* Scroll arrows */}
+          <button
+            onClick={() => scroll("left")}
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition"
+          >
+            <ChevronLeft size={14} className="text-slate-500" />
+          </button>
+          <button
+            onClick={() => scroll("right")}
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition"
+          >
+            <ChevronRight size={14} className="text-slate-500" />
+          </button>
+        </div>
+      </div>
+
+      {/* Slider — বাকি সব same থাকবে */}
+      <div
+        ref={sliderRef}
+        className="flex gap-3 overflow-x-auto scroll-smooth pb-2"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {loading
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex shrink-0 flex-col gap-2 rounded-xl border border-slate-100 bg-white p-2 animate-pulse"
+                style={{ width: 160 }}
+              >
+                <div className="h-24 w-full rounded-lg bg-slate-100" />
+                <div className="h-3 w-3/4 rounded-full bg-slate-100" />
+                <div className="h-2.5 w-1/2 rounded-full bg-slate-100" />
+              </div>
+            ))
+          : stores.map((store) => {
+              const rating = avgRating(store as Store);
+              const open =
+                store.isActive &&
+                isOpenNow(store.timing?.open || "", store.timing?.close || "");
+
+              return (
+                <button
+                  key={store._id}
+                  onClick={() => router.push(`/store/${store._id}`)}
+                  className="group flex shrink-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md text-left"
+                  style={{ width: 160 }}
+                >
+                  <div className="relative h-24 w-full overflow-hidden bg-slate-100">
+                    {store.images?.[0] ? (
+                      <img
+                        src={store.images[0]}
+                        alt={store.storeName}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                        onError={(e: any) => {
+                          e.target.src = fallbackImage;
+                        }}
+                      />
+                    ) : (
+                      <div
+                        className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${storeGradient(store.storeName)} text-white`}
+                      >
+                        <span className="text-lg font-black">
+                          {initials(store.storeName)}
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      className={`absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${open ? "bg-emerald-500 text-white" : "bg-black/60 text-slate-300"}`}
+                    >
+                      <span
+                        className={`h-1 w-1 rounded-full ${open ? "bg-white" : "bg-slate-400"}`}
+                      />
+                      {open ? "Open" : "Closed"}
+                    </div>
+                    <div className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm">
+                      <i className="pi pi-clock text-[9px] text-white/80" />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-1 flex-col gap-1 p-2.5">
+                    <p className="line-clamp-2 text-[12px] font-bold leading-snug text-slate-900">
+                      {store.storeName}
+                    </p>
+                    {store.storeType && (
+                      <p className="truncate text-[10px] text-slate-400 font-medium">
+                        {store.storeType}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-1 mt-auto pt-1 border-t border-slate-100">
+                      <div className="flex">
+                        {Array.from({ length: 5 }, (_, i) => (
+                          <i
+                            key={i}
+                            className={`pi ${i < Math.round(rating) ? "pi-star-fill text-amber-400" : "pi-star text-slate-200"} text-[9px]`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-[9px] text-slate-400 font-semibold">
+                        {rating > 0 ? rating.toFixed(1) : "—"}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+      </div>
+
+      <style jsx>{`
+        div::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // ─── HeroBanner ───────────────────────────────────────────────────────────────
 
 function HeroBanner() {
   const [current, setCurrent] = useState(0);
-  const [ads, setAds] = useState<Ad[]>([]);
+  const [ads, setAds] = useState<ProductAd[]>([]);
   const [adsLoading, setAdsLoading] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Fetch Ads ──────────────────────────────────────────────────────────────
   useEffect(() => {
     axiosInstance
       .get("/api/ads")
       .then((res) => {
         const sorted = (res.data.ads || [])
-          .filter((a: Ad) => a.isActive)
-          .sort((a: Ad, b: Ad) => (a.rank ?? 99) - (b.rank ?? 99));
+          .filter((a: ProductAd) => a.isActive && a.productId?.isActive)
+          .sort(
+            (a: ProductAd, b: ProductAd) => (a.rank ?? 99) - (b.rank ?? 99),
+          );
         setAds(sorted);
       })
       .catch(() => setAds([]))
       .finally(() => setAdsLoading(false));
   }, []);
 
-  // ── Auto Slide ─────────────────────────────────────────────────────────────
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (ads.length <= 1) return;
@@ -361,7 +595,6 @@ function HeroBanner() {
     startTimer();
   };
 
-  // ── Skeleton ───────────────────────────────────────────────────────────────
   if (adsLoading) {
     return (
       <div className="flex gap-3">
@@ -394,62 +627,87 @@ function HeroBanner() {
           </div>
         ) : (
           <>
-            {/* Slides */}
-            {ads.map((ad, idx) => (
-              <div
-                key={ad._id}
-                className="absolute inset-0 transition-opacity duration-700"
-                style={{
-                  opacity: idx === current ? 1 : 0,
-                  zIndex: idx === current ? 1 : 0,
-                }}
-              >
-                {/* BG Image */}
-                {ad.image && (
-                  <img
-                    src={ad.image}
-                    alt={ad.title}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    onError={(e: any) => {
-                      e.target.style.display = "none";
-                    }}
-                  />
-                )}
-                {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
+            {ads.map((ad, idx) => {
+              const product = ad.productId;
+              const productImage = product.images?.[0];
+              const storeLink = product.storeId
+                ? `/store/${product.storeId._id}`
+                : undefined;
 
-                {/* Text */}
-                <div className="absolute inset-0 z-10 flex flex-col justify-center p-6 max-w-[75%]">
-                  <span className="mb-2 w-fit rounded-full bg-amber-500/20 border border-amber-400/40 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-300">
-                    Advertisement
-                  </span>
-                  <h2 className="text-xl font-black leading-tight text-white sm:text-2xl">
-                    {ad.title}
-                  </h2>
-                  {ad.description && (
-                    <p className="mt-1.5 text-xs text-white/70 leading-relaxed line-clamp-2">
-                      {ad.description}
-                    </p>
+              return (
+                <div
+                  key={ad._id}
+                  className="absolute inset-0 transition-opacity duration-700"
+                  style={{
+                    opacity: idx === current ? 1 : 0,
+                    zIndex: idx === current ? 1 : 0,
+                  }}
+                >
+                  {/* BG Image */}
+                  {productImage && (
+                    <img
+                      src={productImage}
+                      alt={product.name}
+                      className="absolute inset-0 h-full w-full object-cover"
+                      onError={(e: any) => {
+                        e.target.style.display = "none";
+                      }}
+                    />
                   )}
-                  {ad.redirectUrl &&
-                    ad.redirectUrl !== "https://" &&
-                    ad.redirectUrl.startsWith("http") && (
+                  {/* Gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
+
+                  {/* Content */}
+                  <div className="absolute inset-0 z-10 flex flex-col justify-center p-5 max-w-[75%]">
+                    <span className="mb-2 w-fit rounded-full bg-amber-500/20 border border-amber-400/40 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-300">
+                      Advertisement
+                    </span>
+
+                    <h2 className="text-xl font-black leading-tight text-white sm:text-2xl line-clamp-2">
+                      {product.name}
+                    </h2>
+
+                    {product.description && (
+                      <p className="mt-1 text-xs text-white/70 leading-relaxed line-clamp-2">
+                        {product.description}
+                      </p>
+                    )}
+
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      {product.sellingPrice !== undefined && (
+                        <span className="text-base font-black text-amber-400">
+                          ₹{product.sellingPrice.toLocaleString("en-IN")}
+                        </span>
+                      )}
+                      {product.isVerified && (
+                        <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                          ✓ Verified
+                        </span>
+                      )}
+                    </div>
+
+                    {product.storeId && (
+                      <p className="mt-1 text-[10px] text-white/50">
+                        by {product.storeId.storeName}
+                      </p>
+                    )}
+
+                    {storeLink && (
                       <a
-                        href={ad.redirectUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-4 w-fit rounded-lg bg-amber-500 px-5 py-2 text-sm font-bold text-white transition hover:bg-amber-600 shadow-md"
+                        href={storeLink}
+                        className="mt-3 w-fit rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-bold text-white transition hover:bg-amber-600 shadow-md"
                       >
-                        Learn More →
+                        View Store →
                       </a>
                     )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Dots */}
             {ads.length > 1 && (
-              <div className="absolute bottom-3 left-6 z-10 flex gap-1.5">
+              <div className="absolute bottom-3 left-5 z-10 flex gap-1.5">
                 {ads.map((_, idx) => (
                   <button
                     key={idx}
@@ -462,14 +720,14 @@ function HeroBanner() {
               </div>
             )}
 
-            {/* Rank badge */}
+            {/* Counter badge */}
             <div className="absolute bottom-3 right-4 z-10">
               <span className="rounded-full bg-white/10 backdrop-blur-sm border border-white/20 px-2.5 py-0.5 text-[10px] font-semibold text-white/70">
                 {current + 1} / {ads.length}
               </span>
             </div>
 
-            {/* Arrows */}
+            {/* Prev / Next arrows */}
             {ads.length > 1 && (
               <>
                 <button
@@ -490,7 +748,7 @@ function HeroBanner() {
         )}
       </div>
 
-      {/* RIGHT: 4 Service Cards (static — unchanged) */}
+      {/* RIGHT: 4 Service Cards — unchanged */}
       <div
         className="hidden sm:grid grid-cols-2 gap-2 shrink-0"
         style={{ width: "43%", height: 230 }}
@@ -806,6 +1064,7 @@ function StoreCard({ store }: { store: Store }) {
   const rating = avgRating(store);
   const reviews = reviewCount(store);
   const views = toNum(store.viewCount);
+  const distance = store._distance; // ← added
   const open =
     store.isActive &&
     isOpenNow(store.timing?.open || "", store.timing?.close || "");
@@ -850,6 +1109,14 @@ function StoreCard({ store }: { store: Store }) {
           {hasGst(store) && (
             <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
               GST ✓
+            </span>
+          )}
+          {distance !== undefined && (
+            <span className="rounded-full bg-blue-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+              📍{" "}
+              {distance < 1
+                ? `${Math.round(distance * 1000)}m`
+                : `${distance.toFixed(1)}km`}
             </span>
           )}
         </div>
@@ -947,6 +1214,16 @@ export default function Home() {
   const [subCategoryLoading, setSubCategoryLoading] = useState(false);
   const [categoryViewActive, setCategoryViewActive] = useState(false);
   const [categoryViewName, setCategoryViewName] = useState("");
+  const [nearbyRadius, setNearbyRadius] = useState<number>(10);
+  const [userLatLng, setUserLatLng] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [locationModal, setLocationModal] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [nearbyStores, setNearbyStores] = useState<Store[]>([]);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
 
   const fetchStoresBySubCategory = async (subCategoryId: string) => {
     setSubCategoryLoading(true);
@@ -968,6 +1245,27 @@ export default function Home() {
     setSubCategoryStores([]);
   };
 
+  const fetchNearbyStores = useCallback(
+    async (lat: number, lng: number, radius: number) => {
+      setNearbyLoading(true);
+      try {
+        const res = await axiosInstance.get(
+          `/api/register/nearby-stores?lat=${lat}&long=${lng}&radius=${radius}`,
+        );
+        const stores: Store[] = (res.data.stores || []).map((s: any) => ({
+          ...s,
+          _distance: s.distance,
+        }));
+        setNearbyStores(stores);
+      } catch {
+        setNearbyStores([]);
+      } finally {
+        setNearbyLoading(false);
+      }
+    },
+    [],
+  );
+
   // fetch
   useEffect(() => {
     (async () => {
@@ -984,6 +1282,12 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (activeFeed === "nearby" && userLatLng) {
+      fetchNearbyStores(userLatLng.lat, userLatLng.lng, nearbyRadius);
+    }
+  }, [nearbyRadius, activeFeed, userLatLng, fetchNearbyStores]);
+
+  useEffect(() => {
     setVisibleCount(INITIAL_SIZE);
   }, [
     search,
@@ -996,13 +1300,13 @@ export default function Home() {
   ]);
 
   useEffect(() => {
-  const stateFromUrl = searchParams.get("state");
-  if (stateFromUrl) {
-    setSelectedState(stateFromUrl);
-  } else {
-    setSelectedState("all");
-  }
-}, [searchParams]);
+    const stateFromUrl = searchParams.get("state");
+    if (stateFromUrl) {
+      setSelectedState(stateFromUrl);
+    } else {
+      setSelectedState("all");
+    }
+  }, [searchParams]);
 
   const uniqueCategories = useMemo(
     () =>
@@ -1106,6 +1410,27 @@ export default function Home() {
           .sort((a, b) => discoveryScore(b) - discoveryScore(a));
       case "random":
         return [...stores].sort(() => Math.random() - 0.5);
+      case "nearby": {
+        if (!userLatLng) return [];
+        return nearbyStores
+          .filter((s) => {
+            const searchable = normalizeText(
+              [
+                s.storeName,
+                s.storeType,
+                s.address?.area,
+                s.address?.state,
+                s.description,
+                s.userId?.name,
+              ]
+                .filter(Boolean)
+                .join(" "),
+            );
+            if (q && !searchable.includes(q)) return false;
+            return true;
+          })
+          .sort((a, b) => (a._distance ?? 0) - (b._distance ?? 0));
+      }
       default:
         return stores.sort((a, b) => discoveryScore(b) - discoveryScore(a));
     }
@@ -1118,6 +1443,8 @@ export default function Home() {
     selectedState,
     selectedArea,
     location,
+    nearbyStores,
+    userLatLng,
   ]);
 
   const pagedStores = useMemo(
@@ -1136,6 +1463,31 @@ export default function Home() {
     activeSubCategoryId // ← add
   );
 
+  const requestUserLocation = () => {
+    setLocationError(null);
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setUserLatLng({ lat, lng });
+        setLocationLoading(false);
+        setLocationModal(false);
+        setActiveFeed("nearby");
+        fetchNearbyStores(lat, lng, nearbyRadius);
+      },
+      (err) => {
+        setLocationLoading(false);
+        setLocationError(
+          err.code === 1
+            ? "Location permission denied. Please allow location access in your browser."
+            : "Unable to get your location. Please try again.",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  };
+
   const clearAll = () => {
     setSearch("");
     setLocation("");
@@ -1145,8 +1497,10 @@ export default function Home() {
     setSelectedArea("all");
     setActiveCategoryTab("all");
     clearSubCategoryFilter();
-    setCategoryViewActive(false); // ← reset
+    setCategoryViewActive(false);
     setCategoryViewName("");
+    setUserLatLng(null);
+    setLocationError(null);
     router.push("/store");
   };
 
@@ -1333,9 +1687,7 @@ export default function Home() {
     <div className="min-h-screen bg-white text-slate-900">
       <Header />
 
-      {/* ════════════════════════════════════════
-          SECTION 3 — Category Icons (JD tiles)
-      ════════════════════════════════════════ */}
+      {/* ── Category Icons ── */}
       <section className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <CategoryGrid
@@ -1352,23 +1704,25 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ════════════════════════════════════════
-          SECTION 2 — Hero Slider + Service Cards
-      ════════════════════════════════════════ */}
+      {/* ── Hero Banner ── */}
       <section className="border-b border-slate-100 bg-white px-4 py-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <HeroBanner />
         </div>
       </section>
 
-      {/* ════════════════════════════════════════
-          SECTION 4 — Filters + Store Grid
-      ════════════════════════════════════════ */}
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      {/* ── Recent Searches ── */}
+      <section className="border-b border-slate-100 bg-slate-50 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <RecentSearches />
+        </div>
+      </section>
+
+      {/* ── Store Grid ── */}
+      <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-          {/* ── Sidebar ── */}
+          {/* Sidebar */}
           <aside className="w-full shrink-0 space-y-4 lg:sticky lg:top-4 lg:w-56">
-            {/* Browse by */}
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 px-4 py-3">
                 <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">
@@ -1379,7 +1733,17 @@ export default function Home() {
                 {FEED_MODES.map((mode) => (
                   <button
                     key={mode.key}
-                    onClick={() => setActiveFeed(mode.key)}
+                    onClick={() => {
+                      if (mode.key === "nearby") {
+                        if (!userLatLng) {
+                          setLocationModal(true);
+                        } else {
+                          setActiveFeed("nearby");
+                        }
+                      } else {
+                        setActiveFeed(mode.key);
+                      }
+                    }}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition ${
                       activeFeed === mode.key
                         ? "text-white"
@@ -1398,11 +1762,67 @@ export default function Home() {
                       className={`pi ${mode.icon} text-sm ${activeFeed === mode.key ? "text-white" : "text-slate-400"}`}
                     />
                     {mode.label}
+                    {mode.key === "nearby" &&
+                      userLatLng &&
+                      activeFeed !== "nearby" && (
+                        <span className="ml-auto rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600">
+                          ON
+                        </span>
+                      )}
                     {activeFeed === mode.key && (
                       <i className="pi pi-check ml-auto text-xs text-white" />
                     )}
                   </button>
                 ))}
+
+                {/* Nearby radius pills — sidebar এ, filter active থাকলে দেখাবে */}
+                {activeFeed === "nearby" && userLatLng && (
+                  <div className="mt-1 px-1 space-y-2">
+                    {/* Preset pills */}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {[5, 10, 20, 50].map((km) => (
+                        <button
+                          key={km}
+                          onClick={() => setNearbyRadius(km)}
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                            nearbyRadius === km
+                              ? "text-white shadow-sm"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          }`}
+                          style={
+                            nearbyRadius === km
+                              ? {
+                                  background:
+                                    "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                                }
+                              : {}
+                          }
+                        >
+                          {km} km
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Custom input */}
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={1}
+                        max={500}
+                        value={nearbyRadius}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (val >= 1 && val <= 500) setNearbyRadius(val);
+                        }}
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-blue-400 focus:bg-white transition"
+                        placeholder="Custom km..."
+                      />
+                      <span className="shrink-0 text-[11px] font-semibold text-slate-400">
+                        km
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1416,18 +1836,22 @@ export default function Home() {
             )}
           </aside>
 
-          {/* ── Store Grid ── */}
+          {/* Store Grid */}
           <div className="min-w-0 flex-1 space-y-5">
-            {/* Results header */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-black text-slate-900">
-                  {FEED_MODES.find((m) => m.key === activeFeed)?.label ||
-                    "All Stores"}
+                  {activeFeed === "nearby" && userLatLng
+                    ? `Stores within ${nearbyRadius} km`
+                    : FEED_MODES.find((m) => m.key === activeFeed)?.label ||
+                      "All Stores"}
                 </h2>
                 <p className="text-sm text-slate-500">
                   {visibleStores.length} stores found
                   {search.trim() ? ` for "${search}"` : ""}
+                  {activeFeed === "nearby" && userLatLng
+                    ? ` · within ${nearbyRadius} km`
+                    : ""}
                 </p>
               </div>
               {hasFilters && (
@@ -1442,14 +1866,6 @@ export default function Home() {
                     >
                       &quot;{search}&quot;
                       <button onClick={() => setSearch("")}>
-                        <i className="pi pi-times text-[10px]" />
-                      </button>
-                    </span>
-                  )}
-                  {selectedCategory !== "all" && (
-                    <span className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                      {selectedCategory}
-                      <button onClick={() => setSelectedCategory("all")}>
                         <i className="pi pi-times text-[10px]" />
                       </button>
                     </span>
@@ -1480,7 +1896,7 @@ export default function Home() {
                   Try again
                 </button>
               </div>
-            ) : loading || subCategoryLoading ? (
+            ) : loading || subCategoryLoading || nearbyLoading ? (
               <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: 9 }).map((_, i) => (
                   <SkeletonCard key={i} />
@@ -1536,8 +1952,154 @@ export default function Home() {
         </div>
       </div>
 
-      <ScrollToTop />
+      {locationModal && (
+        <div
+          className="fixed inset-0 z-[999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+          onClick={() => !locationLoading && setLocationModal(false)}
+        >
+          <div
+            className="w-full max-w-sm overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top gradient bar */}
+            <div
+              className="h-1 w-full"
+              style={{
+                background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+              }}
+            />
 
+            {/* Body */}
+            <div className="px-6 pt-6 pb-5 text-center">
+              {/* Icon */}
+              <div
+                className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full"
+                style={{
+                  background: "linear-gradient(135deg, #1a3a6b, #2196d3)",
+                }}
+              >
+                <i className="pi pi-map-marker text-2xl text-white" />
+              </div>
+
+              <h2 className="text-lg font-black text-slate-900">
+                Find Nearby Stores
+              </h2>
+              <p className="mt-1.5 text-sm text-slate-500 leading-relaxed">
+                Allow location access to discover stores around you within your
+                chosen distance.
+              </p>
+
+              {/* Radius selector */}
+              <div className="mt-4">
+                <p className="mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  Search Radius
+                </p>
+                <div className="flex items-center gap-2">
+                  {/* Preset buttons */}
+                  <div className="flex gap-1.5">
+                    {[5, 10, 20, 50].map((km) => (
+                      <button
+                        key={km}
+                        onClick={() => setNearbyRadius(km)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                          nearbyRadius === km
+                            ? "text-white shadow-sm"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                        style={
+                          nearbyRadius === km
+                            ? {
+                                background:
+                                  "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                              }
+                            : {}
+                        }
+                      >
+                        {km}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Custom input */}
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={1}
+                      max={500}
+                      defaultValue={nearbyRadius}
+                      onBlur={(e) => {
+                        const val = Number(e.target.value);
+                        if (val >= 1 && val <= 500) setNearbyRadius(val);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const val = Number(
+                            (e.target as HTMLInputElement).value,
+                          );
+                          if (val >= 1 && val <= 500) setNearbyRadius(val);
+                        }
+                      }}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-blue-400 focus:bg-white transition"
+                      placeholder="Custom km..."
+                    />
+                    <span className="shrink-0 text-[11px] font-semibold text-slate-400">
+                      km
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Error */}
+              {locationError && (
+                <div className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 border border-red-100 px-3.5 py-2.5 text-left text-xs text-red-600">
+                  <i className="pi pi-exclamation-circle mt-0.5 shrink-0" />
+                  {locationError}
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="mt-5 flex gap-2.5">
+                <button
+                  onClick={() => {
+                    setLocationModal(false);
+                    setLocationError(null);
+                  }}
+                  disabled={locationLoading}
+                  className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={requestUserLocation}
+                  disabled={locationLoading}
+                  className="flex flex-[2] items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white shadow-sm transition disabled:opacity-60"
+                  style={{
+                    background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+                  }}
+                >
+                  {locationLoading ? (
+                    <>
+                      <i className="pi pi-spin pi-spinner text-sm" />
+                      Getting location...
+                    </>
+                  ) : (
+                    <>
+                      <i className="pi pi-map-marker text-sm" />
+                      Allow Location
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <p className="mt-3 text-[10px] text-slate-300">
+                Your location is used only for filtering — never stored.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ScrollToTop />
       <Footer />
     </div>
   );
