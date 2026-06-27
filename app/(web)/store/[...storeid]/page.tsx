@@ -234,11 +234,12 @@ const formatReviewDate = (value: string) =>
     year: "numeric",
   }).format(new Date(value));
 
-const renderRatingStars = (rating: number, size = "text-sm") =>
+const renderRatingStars = (rating: number, size = "9px") =>
   Array.from({ length: 5 }, (_, index) => (
     <i
       key={index}
-      className={`pi pi-star-fill ${size} ${index < Math.round(rating) ? "text-amber-400" : "text-slate-200"}`}
+      className={`pi pi-star-fill ${index < Math.round(rating) ? "text-amber-400" : "text-slate-200"}`}
+      style={{ fontSize: size }}
     />
   ));
 
@@ -991,7 +992,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({
                   className="transition-transform hover:scale-110 active:scale-95"
                 >
                   <i
-                    className={`pi pi-star-fill text-2xl transition-colors duration-150 ${
+                    className={`pi pi-star-fill text-[9px] transition-colors duration-150 ${
                       star <= active ? "text-amber-400" : "text-slate-200"
                     }`}
                   />
@@ -1769,7 +1770,7 @@ export default function StoreDetails() {
                       {averageRating.toFixed(1)}
                     </span>
                     <div className="flex gap-0.5">
-                      {renderRatingStars(averageRating, "text-[11px]")}
+                      {renderRatingStars(averageRating, "10px")}
                     </div>
                     <span className="text-[11px] text-slate-400">
                       ({reviews.length})
@@ -1794,7 +1795,7 @@ export default function StoreDetails() {
                       {storeIsOpenNow ? "Open" : "Closed"}
                     </span>
                     <span className="text-xs text-slate-500">
-                      · Opens {store.timing.open}
+                      · {store.timing.open} - {store.timing.close}
                     </span>
                   </div>
                 </div>
@@ -1881,14 +1882,14 @@ export default function StoreDetails() {
                         background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
                       }}
                     >
-                      <i className="pi pi-star-fill text-sm" />
+                      <i className="pi pi-star-fill text-[9px]" />
                       Write a Review
                     </button>
                   </div>
 
                   {reviews.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-4">
-                      <i className="pi pi-star text-xl text-slate-200 mb-1" />
+                      <i className="pi pi-star text-[9px] text-slate-200 mb-1" />
                       <p className="text-xs text-slate-400">
                         No reviews yet. Be the first!
                       </p>
@@ -1929,7 +1930,7 @@ export default function StoreDetails() {
                                 transformOrigin: "left center",
                               }}
                             >
-                              {renderRatingStars(review.rating, "text-xs")}
+                              {renderRatingStars(averageRating, "15px")}
                             </div>
                             <p className="text-[11px] text-slate-600 leading-snug line-clamp-2">
                               {review.comment}
@@ -2457,7 +2458,7 @@ export default function StoreDetails() {
                 <div className="max-h-[75vh] overflow-y-auto divide-y divide-slate-100">
                   {reviews.length === 0 ? (
                     <div className="px-5 py-10 text-center">
-                      <i className="pi pi-star text-3xl text-slate-200" />
+                      <i className="pi pi-star text-[9px] text-slate-200" />
                       <p className="mt-3 text-sm text-slate-500">
                         No reviews yet.
                       </p>
@@ -2491,7 +2492,7 @@ export default function StoreDetails() {
                             </p>
                           </div>
                           <div className="flex gap-0.5 mt-[2px]">
-                            {renderRatingStars(review.rating, "text-[10px]")}
+                            {renderRatingStars(averageRating, "15px")}
                           </div>
                           <p className="text-xs leading-snug text-slate-600 mt-[2px]">
                             {review.comment}

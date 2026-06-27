@@ -348,11 +348,13 @@ const GRADIENTS = [
 ];
 const storeGradient = (name: string) =>
   GRADIENTS[Math.abs(name.charCodeAt(0)) % GRADIENTS.length];
+
 const renderStars = (rating: number) =>
   Array.from({ length: 5 }, (_, i) => (
     <i
       key={i}
-      className={`pi ${i < Math.round(rating) ? "pi-star-fill text-amber-400" : "pi-star text-slate-300"} text-[11px]`}
+      className={`pi ${i < Math.round(rating) ? "pi-star-fill text-amber-400" : "pi-star text-slate-300"}`}
+      style={{ fontSize: "10px" }}
     />
   ));
 
@@ -517,7 +519,8 @@ function RecentSearches() {
                         {Array.from({ length: 5 }, (_, i) => (
                           <i
                             key={i}
-                            className={`pi ${i < Math.round(rating) ? "pi-star-fill text-amber-400" : "pi-star text-slate-200"} text-[9px]`}
+                            className={`pi ${i < Math.round(rating) ? "pi-star-fill text-amber-400" : "pi-star text-slate-200"}`}
+                            style={{ fontSize: "9px" }}
                           />
                         ))}
                       </div>
@@ -543,10 +546,8 @@ function RecentSearches() {
 // ─── HeroBanner ───────────────────────────────────────────────────────────────
 
 function HeroBanner() {
-  const [current, setCurrent] = useState(0);
   const [ads, setAds] = useState<ProductAd[]>([]);
   const [adsLoading, setAdsLoading] = useState(true);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     axiosInstance
@@ -554,14 +555,71 @@ function HeroBanner() {
       .then((res) => {
         const sorted = (res.data.ads || [])
           .filter((a: ProductAd) => a.isActive && a.productId?.isActive)
-          .sort(
-            (a: ProductAd, b: ProductAd) => (a.rank ?? 99) - (b.rank ?? 99),
-          );
+          .sort((a: ProductAd, b: ProductAd) => (a.rank ?? 999) - (b.rank ?? 999));
         setAds(sorted);
       })
       .catch(() => setAds([]))
       .finally(() => setAdsLoading(false));
   }, []);
+
+  // ─── Bucket ads by rank range ────────────────────────────────
+  const buckets = useMemo(() => {
+    const ranges: Array<{ min: number; max: number }> = [
+      { min: 1, max: 20 },
+      { min: 21, max: 40 },
+      { min: 41, max: 60 },
+      { min: 61, max: 80 },
+      { min: 81, max: 100 },
+    ];
+    return ranges.map((range) =>
+      ads.filter((ad) => {
+        const r = ad.rank ?? 999;
+        return r >= range.min && r <= range.max;
+      }),
+    );
+  }, [ads]);
+
+  const mainAds = buckets[0];
+  const sideBuckets = buckets.slice(1); // 4 buckets for the 4 side cards
+
+  if (adsLoading) {
+    return (
+      <div className="flex gap-3">
+        <div
+          className="relative flex-1 min-w-0 overflow-hidden rounded-2xl bg-slate-100 animate-pulse"
+          style={{ height: 260 }}
+        />
+        <div
+          className="hidden sm:grid grid-cols-2 gap-2 shrink-0"
+          style={{ width: "43%", height: 260 }}
+        >
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-xl bg-slate-100 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-3">
+      <MainAdSlider ads={mainAds} />
+      <div
+        className="hidden sm:grid grid-cols-2 gap-2 shrink-0"
+        style={{ width: "43%", height: 260 }}
+      >
+        {sideBuckets.map((bucketAds, idx) => (
+          <SideAdSlider key={idx} ads={bucketAds} fallback={SERVICE_CARDS[idx]} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main large slider (rank 1-20) ─────────────────────────────
+function MainAdSlider({ ads }: { ads: ProductAd[] }) {
+  const [current, setCurrent] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -595,56 +653,35 @@ function HeroBanner() {
     startTimer();
   };
 
-  if (adsLoading) {
-    return (
-      <div className="flex gap-3">
-        <div
-          className="relative flex-1 min-w-0 overflow-hidden rounded-2xl bg-slate-100 animate-pulse"
-          style={{ height: 230 }}
-        />
-        <div
-          className="hidden sm:grid grid-cols-2 gap-2 shrink-0"
-          style={{ width: "43%", height: 230 }}
-        >
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-xl bg-slate-100 animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex gap-3">
-      {/* LEFT: Ad Slider */}
-      <div
-        className="relative flex-1 min-w-0 overflow-hidden rounded-2xl bg-slate-900"
-        style={{ height: 230 }}
-      >
-        {ads.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-slate-400 text-sm">
-            No ads available
-          </div>
-        ) : (
-          <>
-            {ads.map((ad, idx) => {
-              const product = ad.productId;
-              const productImage = product.images?.[0];
-              const storeLink = product.storeId
-                ? `/store/${product.storeId._id}`
-                : undefined;
+    <div
+      className="relative flex-1 min-w-0 overflow-hidden rounded-2xl bg-slate-950"
+      style={{ height: 260 }}
+    >
+      {ads.length === 0 ? (
+        <div className="flex h-full items-center justify-center text-slate-400 text-sm">
+          No ads available
+        </div>
+      ) : (
+        <>
+          {ads.map((ad, idx) => {
+            const product = ad.productId;
+            const productImage = product.images?.[0];
+            const storeLink = product.storeId
+              ? `/store/${product.storeId._id}`
+              : undefined;
 
-              return (
-                <div
-                  key={ad._id}
-                  className="absolute inset-0 transition-opacity duration-700"
-                  style={{
-                    opacity: idx === current ? 1 : 0,
-                    zIndex: idx === current ? 1 : 0,
-                  }}
-                >
-                  {/* BG Image */}
-                  {productImage && (
+            return (
+              <div
+                key={ad._id}
+                className="absolute inset-0 transition-opacity duration-700"
+                style={{
+                  opacity: idx === current ? 1 : 0,
+                  zIndex: idx === current ? 1 : 0,
+                }}
+              >
+                {productImage && (
+                  <>
                     <img
                       src={productImage}
                       alt={product.name}
@@ -653,136 +690,210 @@ function HeroBanner() {
                         e.target.style.display = "none";
                       }}
                     />
+                    <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/40 to-transparent" />
+                  </>
+                )}
+                {!productImage && (
+                  <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-800" />
+                )}
+
+                <div className="absolute left-4 top-4 z-10">
+                  <span className="rounded-md border border-amber-400/30 bg-amber-400/10 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[2px] text-amber-300">
+                    Advertisement
+                  </span>
+                </div>
+
+                <div className="absolute inset-y-0 left-0 z-10 flex max-w-[62%] flex-col justify-center px-6 py-5">
+                  <h2 className="line-clamp-2 text-[1.4rem] font-black leading-tight text-white">
+                    {product.name}
+                  </h2>
+                  {product.description && (
+                    <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-white/55">
+                      {product.description}
+                    </p>
                   )}
-                  {/* Gradient overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
-
-                  {/* Content */}
-                  <div className="absolute inset-0 z-10 flex flex-col justify-center p-5 max-w-[75%]">
-                    <span className="mb-2 w-fit rounded-full bg-amber-500/20 border border-amber-400/40 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-300">
-                      Advertisement
-                    </span>
-
-                    <h2 className="text-xl font-black leading-tight text-white sm:text-2xl line-clamp-2">
-                      {product.name}
-                    </h2>
-
-                    {product.description && (
-                      <p className="mt-1 text-xs text-white/70 leading-relaxed line-clamp-2">
-                        {product.description}
-                      </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {product.sellingPrice !== undefined && (
+                      <span className="text-xl font-black text-amber-400">
+                        ₹{product.sellingPrice.toLocaleString("en-IN")}
+                      </span>
                     )}
-
-                    <div className="mt-2 flex items-center gap-2 flex-wrap">
-                      {product.sellingPrice !== undefined && (
-                        <span className="text-base font-black text-amber-400">
-                          ₹{product.sellingPrice.toLocaleString("en-IN")}
-                        </span>
-                      )}
-                      {product.isVerified && (
-                        <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                          ✓ Verified
-                        </span>
-                      )}
-                    </div>
-
-                    {product.storeId && (
-                      <p className="mt-1 text-[10px] text-white/50">
-                        by {product.storeId.storeName}
-                      </p>
-                    )}
-
-                    {storeLink && (
-                      <a
-                        href={storeLink}
-                        className="mt-3 w-fit rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-bold text-white transition hover:bg-amber-600 shadow-md"
-                      >
-                        View Store →
-                      </a>
+                    {product.isVerified && (
+                      <span className="rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                        ✓ Verified
+                      </span>
                     )}
                   </div>
+                  {product.storeId && (
+                    <p className="mt-1 text-[10px] text-white/35">
+                      by {product.storeId.storeName}
+                    </p>
+                  )}
+                  {storeLink && (
+                    
+                      <a href={storeLink}
+                      className="mt-4 w-fit rounded-lg bg-amber-500 px-5 py-2 text-xs font-bold text-white shadow-md transition hover:bg-amber-400"
+                    >
+                      View Store →
+                    </a>
+                  )}
                 </div>
-              );
-            })}
-
-            {/* Dots */}
-            {ads.length > 1 && (
-              <div className="absolute bottom-3 left-5 z-10 flex gap-1.5">
-                {ads.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => go(idx)}
-                    className={`h-1.5 rounded-full transition-all duration-300 ${
-                      idx === current ? "w-5 bg-amber-400" : "w-1.5 bg-white/40"
-                    }`}
-                  />
-                ))}
               </div>
-            )}
+            );
+          })}
 
-            {/* Counter badge */}
-            <div className="absolute bottom-3 right-4 z-10">
-              <span className="rounded-full bg-white/10 backdrop-blur-sm border border-white/20 px-2.5 py-0.5 text-[10px] font-semibold text-white/70">
-                {current + 1} / {ads.length}
-              </span>
+          {ads.length > 1 && (
+            <div className="absolute bottom-4 left-6 z-20 flex gap-1.5">
+              {ads.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => go(idx)}
+                  className={`h-1 rounded-full transition-all duration-300 ${
+                    idx === current ? "w-6 bg-amber-400" : "w-2 bg-white/25 hover:bg-white/40"
+                  }`}
+                />
+              ))}
             </div>
+          )}
 
-            {/* Prev / Next arrows */}
-            {ads.length > 1 && (
-              <>
-                <button
-                  onClick={prev}
-                  className="absolute left-2 top-1/2 z-20 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition"
-                >
-                  <i className="pi pi-chevron-left text-xs" />
-                </button>
-                <button
-                  onClick={next}
-                  className="absolute right-2 top-1/2 z-20 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/30 text-white hover:bg-black/50 transition"
-                >
-                  <i className="pi pi-chevron-right text-xs" />
-                </button>
-              </>
-            )}
-          </>
+          <div className="absolute bottom-4 right-4 z-20">
+            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-semibold text-white/40">
+              {current + 1} / {ads.length}
+            </span>
+          </div>
+
+          {ads.length > 1 && (
+            <>
+              <button
+                onClick={prev}
+                className="absolute left-3 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/8 text-white transition hover:bg-white/15"
+              >
+                <i className="pi pi-chevron-left text-xs" />
+              </button>
+              <button
+                onClick={next}
+                className="absolute right-3 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/8 text-white transition hover:bg-white/15"
+              >
+                <i className="pi pi-chevron-right text-xs" />
+              </button>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Small side slider (rank 21-40, 41-60, 61-80, 81-100) ──────
+function SideAdSlider({
+  ads,
+  fallback,
+}: {
+  ads: ProductAd[];
+  fallback: (typeof SERVICE_CARDS)[number];
+}) {
+  const [current, setCurrent] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (ads.length <= 1) return;
+    timerRef.current = setInterval(() => {
+      setCurrent((p) => (p + 1) % ads.length);
+    }, 3500 + Math.random() * 1000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [ads.length]);
+
+  useEffect(() => {
+    setCurrent(0);
+  }, [ads]);
+
+  // No ads in this bucket — fall back to the static service card
+  if (ads.length === 0) {
+    return (
+      <div
+        className="relative overflow-hidden rounded-xl cursor-pointer group"
+        style={{ background: fallback.bg }}
+      >
+        <img
+          src={fallback.image}
+          alt={fallback.label}
+          className="absolute bottom-0 right-0 h-full w-auto object-cover object-top opacity-70 group-hover:opacity-90 transition-opacity"
+          onError={(e: any) => {
+            e.target.style.display = "none";
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
+        <div className="relative z-10 p-3">
+          <p className="text-[10px] font-semibold text-white/75 leading-tight uppercase tracking-wide">
+            {fallback.sub}
+          </p>
+          <h3 className="mt-0.5 text-sm font-black leading-tight text-white">
+            {fallback.label}
+          </h3>
+        </div>
+        <div className="absolute bottom-3 left-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-white group-hover:bg-white/40 transition">
+          <i className="pi pi-chevron-right text-[10px]" />
+        </div>
+      </div>
+    );
+  }
+
+  const ad = ads[current];
+  const product = ad.productId;
+  const productImage = product.images?.[0];
+  const storeLink = product.storeId ? `/store/${product.storeId._id}` : "#";
+
+  return (
+    
+      <a href={storeLink}
+      className="relative overflow-hidden rounded-xl cursor-pointer group block bg-slate-900"
+    >
+      {productImage && (
+        <img
+          src={productImage}
+          alt={product.name}
+          className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500"
+          key={ad._id}
+          onError={(e: any) => {
+            e.target.style.display = "none";
+          }}
+        />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+
+      <div className="absolute left-2 top-2 z-10">
+        <span className="rounded bg-amber-400/90 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-amber-950">
+          Ad
+        </span>
+      </div>
+
+      <div className="relative z-10 flex h-full flex-col justify-end p-3">
+        <p className="line-clamp-1 text-[11px] font-black leading-tight text-white">
+          {product.name}
+        </p>
+        {product.sellingPrice !== undefined && (
+          <p className="mt-0.5 text-[10px] font-bold text-amber-300">
+            ₹{product.sellingPrice.toLocaleString("en-IN")}
+          </p>
         )}
       </div>
 
-      {/* RIGHT: 4 Service Cards — unchanged */}
-      <div
-        className="hidden sm:grid grid-cols-2 gap-2 shrink-0"
-        style={{ width: "43%", height: 230 }}
-      >
-        {SERVICE_CARDS.map((card) => (
-          <div
-            key={card.id}
-            className="relative overflow-hidden rounded-xl cursor-pointer group"
-            style={{ background: card.bg }}
-          >
-            <img
-              src={card.image}
-              alt={card.label}
-              className="absolute bottom-0 right-0 h-full w-auto object-cover object-top opacity-70 group-hover:opacity-90 transition-opacity"
-              onError={(e: any) => {
-                e.target.style.display = "none";
-              }}
+      {ads.length > 1 && (
+        <div className="absolute bottom-1.5 right-2 z-10 flex gap-0.5">
+          {ads.map((_, i) => (
+            <span
+              key={i}
+              className={`h-1 rounded-full transition-all ${
+                i === current ? "w-3 bg-amber-400" : "w-1 bg-white/40"
+              }`}
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
-            <div className="relative z-10 p-3">
-              <p className="text-[10px] font-semibold text-white/75 leading-tight uppercase tracking-wide">
-                {card.sub}
-              </p>
-              <h3 className="mt-0.5 text-sm font-black leading-tight text-white">
-                {card.label}
-              </h3>
-            </div>
-            <div className="absolute bottom-3 left-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-white group-hover:bg-white/40 transition">
-              <i className="pi pi-chevron-right text-[10px]" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+          ))}
+        </div>
+      )}
+    </a>
   );
 }
 

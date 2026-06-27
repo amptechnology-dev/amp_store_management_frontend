@@ -99,7 +99,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, user }) => {
     };
   }, []);
 
-    const sections: Section[] = [
+  const sections: Section[] = [
     {
       title: "Menu",
       items: [
@@ -114,6 +114,11 @@ const Sidebar: React.FC<SidebarProps> = ({ role, user }) => {
                 label: "Ads",
                 icon: "pi-megaphone",
                 href: "/dashboard/ads",
+              },
+              {
+                label: "User Actions",
+                icon: "pi-history",
+                href: "/dashboard/store-actions",
               },
             ]
           : []),
@@ -297,73 +302,79 @@ const Sidebar: React.FC<SidebarProps> = ({ role, user }) => {
             )}
 
             {sec.items.map((item) => {
-  const active = isActive(item.href);
+              const active = isActive(item.href);
 
-  return (
-    <Link
-      key={item.label}
-      href={item.href || "#"}
-      className={`sidebar-link${active ? " active" : ""}`}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        justifyContent:
-          collapsed && !isMobile ? "center" : "flex-start",
-        padding: collapsed && !isMobile ? "10px" : "10px 12px",
-        borderRadius: 12,
-        textDecoration: "none",
-        marginBottom: 6,
-        fontWeight: active ? 600 : 500,
-        fontSize: "0.9rem",
-        color: active ? "#fff" : "var(--brand-primary-dark)",
-        background: active
-          ? "linear-gradient(110deg, var(--brand-primary), var(--brand-blue))"
-          : "transparent",
-        boxShadow: active
-          ? "0 8px 20px rgba(26, 58, 107, 0.25)"
-          : "none",
-        transition:
-          "background 0.2s ease, color 0.2s ease, transform 0.15s ease",
-      }}
-    >
-      {/* Icon box - always visible */}
-      <span
-        className="sidebar-icon"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 32,
-          height: 32,
-          minWidth: 32,
-          minHeight: 32,
-          borderRadius: 10,
-          fontSize: 16,
-          lineHeight: 1,
-          flexShrink: 0,
-          background: active
-            ? "rgba(255,255,255,0.18)"
-            : "var(--surface-soft)",
-          border: active ? "none" : "1px solid var(--border)",
-          color: active ? "#fff" : "var(--brand-blue)",
-          transition: "background 0.2s ease, color 0.2s ease",
-        }}
-      >
-        <i
-          className={`pi ${item.icon || "pi-circle"}`}
-          style={{ fontSize: 16, display: "block" }}
-        />
-      </span>
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href || "#"}
+                  className={`sidebar-link${active ? " active" : ""}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    justifyContent:
+                      collapsed && !isMobile ? "center" : "flex-start",
+                    padding: collapsed && !isMobile ? "10px" : "10px 12px",
+                    borderRadius: 12,
+                    textDecoration: "none",
+                    marginBottom: 6,
+                    fontWeight: active ? 600 : 500,
+                    fontSize: "0.9rem",
+                    color: active ? "#fff" : "var(--brand-primary-dark)",
+                    background: active
+                      ? "linear-gradient(110deg, var(--brand-primary), var(--brand-blue))"
+                      : "transparent",
+                    boxShadow: active
+                      ? "0 8px 20px rgba(26, 58, 107, 0.25)"
+                      : "none",
+                    transition:
+                      "background 0.2s ease, color 0.2s ease, transform 0.15s ease",
+                  }}
+                >
+                  {/* Icon box - always visible */}
+                  <span
+                    className="sidebar-icon"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 32,
+                      height: 32,
+                      minWidth: 32,
+                      minHeight: 32,
+                      borderRadius: 10,
+                      fontSize: 16,
+                      lineHeight: 1,
+                      flexShrink: 0,
+                      background: active
+                        ? "rgba(255,255,255,0.18)"
+                        : "var(--surface-soft, #f1f5f9)",
+                      border: active
+                        ? "none"
+                        : "1px solid var(--border, #e2e8f0)",
+                      color: active ? "#fff" : "var(--brand-blue, #2196d3)",
+                      transition: "background 0.2s ease, color 0.2s ease",
+                    }}
+                  >
+                    <i
+                      className={`pi ${item.icon || "pi-circle"}`}
+                      style={{
+                        fontSize: 16,
+                        display: "block",
+                        color: "inherit",
+                      }}
+                    />
+                  </span>
 
-      {showLabels && (
-        <span style={{ flex: 1, whiteSpace: "nowrap" }}>
-          {item.label}
-        </span>
-      )}
-    </Link>
-  );
-})}
+                  {showLabels && (
+                    <span style={{ flex: 1, whiteSpace: "nowrap" }}>
+                      {item.label}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
           </div>
         ))}
       </div>
