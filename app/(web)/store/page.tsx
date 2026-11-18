@@ -11,6 +11,7 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import axiosInstance from "@/service/axios.service";
+import axios from "axios";
 import VortexLoader from "@/app/(web)/components/VortexLoader";
 import { ChevronLeft, ChevronRight, Grid3X3 } from "lucide-react";
 
@@ -106,6 +107,8 @@ interface Store {
   reviews?: StoreReview[];
   createdAt?: string;
   _distance?: number;
+  source?: "local" | "external";
+  externalUrl?: string;
 }
 
 type FeedMode =
@@ -236,7 +239,7 @@ const SERVICE_CARDS = [
 
 const FEED_MODES: Array<{ key: FeedMode; label: string; icon: string }> = [
   { key: "all", label: "All Stores", icon: "pi-th-large" },
-  { key: "nearby", label: "Nearby", icon: "pi-map-marker" }, // ← new
+  { key: "nearby", label: "Nearby", icon: "pi-map-marker" },
   { key: "featured", label: "Featured", icon: "pi-star-fill" },
   { key: "topViewed", label: "Top Viewed", icon: "pi-eye" },
   { key: "topRated", label: "Top Rated", icon: "pi-thumbs-up" },
@@ -310,6 +313,56 @@ const toTs = (v?: string) => {
   const t = new Date(v).getTime();
   return Number.isFinite(t) ? t : 0;
 };
+
+// ─── External API ─────────────────────────────────────────────────────────────
+
+const EXTERNAL_API_URL = process.env.NEXT_PUBLIC_EXTERNAL_API_URL;
+const EXTERNAL_STORE_BASE_URL = "https://example.com/store"; // TODO: pore asol domain dibe
+
+const normalizeExternalStore = (s: any): Store => ({
+  _id: `ext-${s._id}`,
+  storeName: s.storeName ?? "",
+  storeType: s.storeType ?? "",
+  categoryId: s.categoryId,
+  subCategoryId: s.subCategoryId,
+  isFeatured: Boolean(s.isFeatured),
+  viewCount: toNum(s.viewCount),
+  userId: s.userId ?? { _id: "", name: "", email: "", phone: "" },
+  address: {
+    area: s.address?.area ?? "",
+    state: s.address?.state ?? "",
+    country: s.address?.country ?? "",
+  },
+  timing: { open: s.timing?.open ?? "", close: s.timing?.close ?? "" },
+  contactNo: s.contactNo ?? "",
+  whatsappNo: s.whatsappNo ?? "",
+  email: s.email ?? "",
+  website: s.website ?? "",
+  description: s.description ?? "",
+  images: Array.isArray(s.images) ? s.images : [],
+  lat: toNum(s.lat),
+  long: toNum(s.long),
+  gstin: s.gstin ?? "",
+  isActive: Boolean(s.isActive),
+  isVerify: Boolean(s.isVerify),
+  storeUniqueId: s.storeUniqueId ?? "",
+  reviews: Array.isArray(s.reviews) ? s.reviews : [],
+  createdAt: s.createdAt,
+  source: "external",
+  externalUrl: `${EXTERNAL_STORE_BASE_URL}/${s._id}`,
+});
+
+const fetchExternalStores = async (): Promise<Store[]> => {
+  if (!EXTERNAL_API_URL) return [];
+  const res = await axios.get(
+    `${EXTERNAL_API_URL}/api/register/all-stores-no-pagination`,
+    { timeout: 10000 },
+  );
+  return (res.data?.stores || []).map(normalizeExternalStore);
+};
+
+// ─── More helpers ─────────────────────────────────────────────────────────────
+
 const avgRating = (s: Store) => {
   const r = s.reviews || [];
   if (!r.length) return 0;
@@ -442,7 +495,7 @@ function RecentSearches() {
         </div>
       </div>
 
-      {/* Slider — বাকি সব same থাকবে */}
+      {/* Slider */}
       <div
         ref={sliderRef}
         className="flex gap-3 overflow-x-auto scroll-smooth pb-2"
@@ -555,7 +608,9 @@ function HeroBanner() {
       .then((res) => {
         const sorted = (res.data.ads || [])
           .filter((a: ProductAd) => a.isActive && a.productId?.isActive)
-          .sort((a: ProductAd, b: ProductAd) => (a.rank ?? 999) - (b.rank ?? 999));
+          .sort(
+            (a: ProductAd, b: ProductAd) => (a.rank ?? 999) - (b.rank ?? 999),
+          );
         setAds(sorted);
       })
       .catch(() => setAds([]))
@@ -609,7 +664,11 @@ function HeroBanner() {
         style={{ width: "43%", height: 260 }}
       >
         {sideBuckets.map((bucketAds, idx) => (
-          <SideAdSlider key={idx} ads={bucketAds} fallback={SERVICE_CARDS[idx]} />
+          <SideAdSlider
+            key={idx}
+            ads={bucketAds}
+            fallback={SERVICE_CARDS[idx]}
+          />
         ))}
       </div>
     </div>
@@ -730,8 +789,8 @@ function MainAdSlider({ ads }: { ads: ProductAd[] }) {
                     </p>
                   )}
                   {storeLink && (
-                    
-                      <a href={storeLink}
+                    <a
+                      href={storeLink}
                       className="mt-4 w-fit rounded-lg bg-amber-500 px-5 py-2 text-xs font-bold text-white shadow-md transition hover:bg-amber-400"
                     >
                       View Store →
@@ -749,7 +808,9 @@ function MainAdSlider({ ads }: { ads: ProductAd[] }) {
                   key={idx}
                   onClick={() => go(idx)}
                   className={`h-1 rounded-full transition-all duration-300 ${
-                    idx === current ? "w-6 bg-amber-400" : "w-2 bg-white/25 hover:bg-white/40"
+                    idx === current
+                      ? "w-6 bg-amber-400"
+                      : "w-2 bg-white/25 hover:bg-white/40"
                   }`}
                 />
               ))}
@@ -798,9 +859,12 @@ function SideAdSlider({
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (ads.length <= 1) return;
-    timerRef.current = setInterval(() => {
-      setCurrent((p) => (p + 1) % ads.length);
-    }, 3500 + Math.random() * 1000);
+    timerRef.current = setInterval(
+      () => {
+        setCurrent((p) => (p + 1) % ads.length);
+      },
+      3500 + Math.random() * 1000,
+    );
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
@@ -847,8 +911,8 @@ function SideAdSlider({
   const storeLink = product.storeId ? `/store/${product.storeId._id}` : "#";
 
   return (
-    
-      <a href={storeLink}
+    <a
+      href={storeLink}
       className="relative overflow-hidden rounded-xl cursor-pointer group block bg-slate-900"
     >
       {productImage && (
@@ -931,7 +995,7 @@ function CategoryGrid({
 }: {
   activeTab: string;
   onTabChange: (label: string) => void;
-  onSubCategorySelect: (subCategoryId: string, subCategoryName: string) => void; // ← add
+  onSubCategorySelect: (subCategoryId: string, subCategoryName: string) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
   const [categories, setCategories] = useState<ApiCategory[]>([]);
@@ -1052,7 +1116,7 @@ function CategoryGrid({
               {allBtn}
               {categories.map(renderCategoryBtn)}
 
-              {/* ── Show All — slider এর শেষে ── */}
+              {/* Show All — slider er shesh e */}
               <button
                 onClick={() => setShowAll(true)}
                 className="flex shrink-0 flex-col items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-3 transition hover:border-orange-400 hover:bg-orange-100"
@@ -1169,17 +1233,12 @@ function CategoryGrid({
   );
 }
 
-// ─── StoreCard ────────────────────────────────────────────────────────────────
-
 function StoreCard({ store }: { store: Store }) {
+  const isExternal = store.source === "external";
   const rating = avgRating(store);
   const reviews = reviewCount(store);
   const views = toNum(store.viewCount);
-  const distance = store._distance; // ← added
-  const open =
-    store.isActive &&
-    isOpenNow(store.timing?.open || "", store.timing?.close || "");
-  const owner = store.userId?.name || "—";
+  const distance = store._distance;
   const location = [store.address?.area, store.address?.state]
     .filter(Boolean)
     .join(", ");
@@ -1211,6 +1270,7 @@ function StoreCard({ store }: { store: Store }) {
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+
         <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
           {store.isFeatured && (
             <span className="rounded-full bg-amber-400 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
@@ -1230,16 +1290,6 @@ function StoreCard({ store }: { store: Store }) {
                 : `${distance.toFixed(1)}km`}
             </span>
           )}
-        </div>
-        <div
-          className={`absolute bottom-3 left-3 flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
-            open ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-300"
-          }`}
-        >
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${open ? "bg-white" : "bg-slate-400"}`}
-          />
-          {open ? "Open" : "Closed"}
         </div>
       </div>
 
@@ -1262,23 +1312,35 @@ function StoreCard({ store }: { store: Store }) {
             {views}
           </span>
         </div>
-        <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-3">
-          <p
-            className="min-w-0 truncate text-xs text-slate-500"
-            title={location}
-          >
-            📍 {location || "Location not set"}
-          </p>
-          <Link href={`/store/${store._id}`} className="shrink-0">
-            <button
-              className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-white transition"
+
+        <p className="truncate text-xs text-slate-500" title={location}>
+          📍 {location || "Location not set"}
+        </p>
+
+        <div className="mt-auto flex items-center justify-end border-t border-slate-100 pt-3">
+          {isExternal ? (
+            <a
+              href={store.externalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold text-white transition"
               style={{
                 background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
               }}
             >
               View →
-            </button>
-          </Link>
+            </a>
+          ) : (
+            <Link
+              href={`/store/${store._id}`}
+              className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold text-white transition"
+              style={{
+                background: "linear-gradient(110deg, #1a3a6b, #2196d3)",
+              }}
+            >
+              View →
+            </Link>
+          )}
         </div>
       </div>
     </article>
@@ -1377,15 +1439,36 @@ export default function Home() {
     [],
   );
 
-  // fetch
+  // fetch (local + external ek sathe)
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-        const res = await axiosInstance.get("/api/register/public-all-stores");
-        setAllStores(res.data.stores || []);
-      } catch {
-        setError("Failed to load stores. Please try again.");
+        const [localRes, externalRes] = await Promise.allSettled([
+          axiosInstance.get("/api/register/public-all-stores"),
+          fetchExternalStores(),
+        ]);
+
+        const localStores: Store[] =
+          localRes.status === "fulfilled"
+            ? (localRes.value.data.stores || []).map((s: Store) => ({
+                ...s,
+                source: "local" as const,
+              }))
+            : [];
+
+        const externalStores: Store[] =
+          externalRes.status === "fulfilled" ? externalRes.value : [];
+
+        if (
+          localRes.status === "rejected" &&
+          externalRes.status === "rejected"
+        ) {
+          setError("Failed to load stores. Please try again.");
+          return;
+        }
+
+        setAllStores([...localStores, ...externalStores]);
       } finally {
         setLoading(false);
       }
@@ -1571,7 +1654,7 @@ export default function Home() {
     selectedState !== "all" ||
     selectedArea !== "all" ||
     activeCategoryTab !== "all" ||
-    activeSubCategoryId // ← add
+    activeSubCategoryId
   );
 
   const requestUserLocation = () => {
@@ -1886,7 +1969,7 @@ export default function Home() {
                   </button>
                 ))}
 
-                {/* Nearby radius pills — sidebar এ, filter active থাকলে দেখাবে */}
+                {/* Nearby radius pills */}
                 {activeFeed === "nearby" && userLatLng && (
                   <div className="mt-1 px-1 space-y-2">
                     {/* Preset pills */}
